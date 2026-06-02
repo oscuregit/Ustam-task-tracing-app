@@ -1,0 +1,6 @@
+{
+  "name": "Ustam",
+  "description": "Projeleri, son teslim tarihlerini, görev önceliklerini, malzeme bütçelerini ve genel muhasebe raporlarını takip eden tadilat yönetim uygulaması.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

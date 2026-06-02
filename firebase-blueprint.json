@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile that holds authentication details and customized categories",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique user id" },
+        "name": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "description": "User email address" },
+        "role": { "type": "string", "description": "User role or job title" },
+        "company": { "type": "string", "description": "User company" },
+        "avatarUrl": { "type": "string", "description": "User avatar image URL" },
+        "expenseCategories": { "type": "array", "description": "Customized list of expense categories" },
+        "incomeCategories": { "type": "array", "description": "Customized list of income categories" },
+        "settings": { "type": "object", "description": "User specific app display settings" }
+      },
+      "required": ["uid", "name", "email"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Renovation project managed by user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "Owner userId of this project" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["planning", "ongoing", "suspended", "completed"] },
+        "startDate": { "type": "string", "format": "date" },
+        "targetDate": { "type": "string", "format": "date" },
+        "allocatedBudget": { "type": "number" }
+      },
+      "required": ["id", "userId", "name", "status"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Activity tasks under projects",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "Owner userId" },
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+        "status": { "type": "string", "enum": ["todo", "doing", "done"] },
+        "dueDate": { "type": "string", "format": "date" },
+        "assignedTo": { "type": "string" }
+      },
+      "required": ["id", "userId", "projectId", "title", "priority", "status", "dueDate"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Construction or renovation materials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "Owner userId" },
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "vendor": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "unitPrice": { "type": "number" },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["planned", "purchased", "delivered"] },
+        "purchaseDate": { "type": "string", "format": "date" },
+        "isPaid": { "type": "boolean" }
+      },
+      "required": ["id", "userId", "projectId", "title", "category", "quantity", "unit", "unitPrice", "totalPrice", "status", "isPaid"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Accounting ledger transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "Owner userId" },
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "card", "bank_transfer", "debt"] },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "userId", "projectId", "title", "type", "category", "amount", "date", "paymentMethod"]
+    },
+    "RecurringTransaction": {
+      "title": "RecurringTransaction",
+      "description": "Template for repeating monthly transaction templates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "Owner userId" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "dayOfMonth": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "card", "bank_transfer", "debt"] },
+        "isActive": { "type": "boolean" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "type", "category", "amount", "dayOfMonth", "paymentMethod", "isActive"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user customization details, roles, and static setup characteristics"
+    },
+    "projects/{projectId}": {
+      "schema": "Project",
+      "description": "Stores user projects, accessed and authorized only by project document owner's userId matching authenticated session"
+    },
+    "tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Stores tasks associated with projects and user"
+    },
+    "materials/{materialId}": {
+      "schema": "Material",
+      "description": "Stores material objects associated with project budget tracker"
+    },
+    "transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Stores transaction ledger entries under accounting system"
+    },
+    "recurringTransactions/{rectId}": {
+      "schema": "RecurringTransaction",
+      "description": "Stores monthly recurring transaction rules for fast processing"
+    }
+  }
+}

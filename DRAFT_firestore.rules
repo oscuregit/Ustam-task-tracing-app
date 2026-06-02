@@ -1,0 +1,148 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Entity Validation Helpers
+    function isValidUserProfile(data) {
+      return data.uid == request.auth.uid &&
+             data.name is string && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             (!('role' in data) || (data.role is string && data.role.size() <= 100)) &&
+             (!('company' in data) || (data.company is string && data.company.size() <= 100)) &&
+             (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 500)) &&
+             (!('expenseCategories' in data) || (data.expenseCategories is list && data.expenseCategories.size() <= 50)) &&
+             (!('incomeCategories' in data) || (data.incomeCategories is list && data.incomeCategories.size() <= 50)) &&
+             (!('settings' in data) || (data.settings is map));
+    }
+
+    function isValidProject(data) {
+      return data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.status in ['planning', 'ongoing', 'suspended', 'completed'] &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+             (!('startDate' in data) || (data.startDate is string && data.startDate.size() <= 50)) &&
+             (!('targetDate' in data) || (data.targetDate is string && data.targetDate.size() <= 50)) &&
+             (!('allocatedBudget' in data) || (data.allocatedBudget is number && data.allocatedBudget >= 0));
+    }
+
+    function isValidTask(data) {
+      return data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.projectId is string && data.projectId.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.priority in ['low', 'medium', 'high', 'urgent'] &&
+             data.status in ['todo', 'doing', 'done'] &&
+             data.dueDate is string && data.dueDate.size() <= 50 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+             (!('assignedTo' in data) || (data.assignedTo is string && data.assignedTo.size() <= 100));
+    }
+
+    function isValidMaterial(data) {
+      return data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.projectId is string && data.projectId.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.quantity is number && data.quantity >= 0 &&
+             data.unit is string && data.unit.size() <= 50 &&
+             data.unitPrice is number && data.unitPrice >= 0 &&
+             data.totalPrice is number && data.totalPrice >= 0 &&
+             data.status in ['planned', 'purchased', 'delivered'] &&
+             data.isPaid is bool &&
+             (!('vendor' in data) || (data.vendor is string && data.vendor.size() <= 200)) &&
+             (!('purchaseDate' in data) || (data.purchaseDate is string && data.purchaseDate.size() <= 50));
+    }
+
+    function isValidTransaction(data) {
+      return data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.projectId is string && data.projectId.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.type in ['income', 'expense'] &&
+             data.category is string && data.category.size() <= 100 &&
+             data.amount is number && data.amount >= 0 &&
+             data.date is string && data.date.size() <= 50 &&
+             data.paymentMethod in ['cash', 'card', 'bank_transfer', 'debt'] &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
+    }
+
+    function isValidRecurringTransaction(data) {
+      return data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.type in ['income', 'expense'] &&
+             data.category is string && data.category.size() <= 100 &&
+             data.amount is number && data.amount >= 0 &&
+             data.dayOfMonth is number && data.dayOfMonth >= 1 && data.dayOfMonth <= 31 &&
+             data.paymentMethod in ['cash', 'card', 'bank_transfer', 'debt'] &&
+             data.isActive is bool &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
+    }
+
+    // Collections matches
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId && isValidUserProfile(incoming());
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /projects/{projectId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(projectId) && isValidProject(incoming());
+      allow update: if isSignedIn() && isValidId(projectId) && isValidProject(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /tasks/{taskId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming());
+      allow update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /materials/{materialId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming());
+      allow update: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /transactions/{transactionId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming());
+      allow update: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /recurringTransactions/{rectId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(rectId) && isValidRecurringTransaction(incoming());
+      allow update: if isSignedIn() && isValidId(rectId) && isValidRecurringTransaction(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+  }
+}
