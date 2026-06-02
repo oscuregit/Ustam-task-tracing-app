@@ -95,6 +95,10 @@ export default function App() {
       for (const tr of INITIAL_TRANSACTIONS) {
         await setDoc(doc(db, 'transactions', tr.id), { ...tr, userId: uid });
       }
+      // Save a persistent flag in user profile so projects aren't re-seeded when they delete all of them
+      const profileRef = doc(db, 'users', uid);
+      await setDoc(profileRef, { hasSeededData: true }, { merge: true });
+      setUserProfile((prev: any) => prev ? { ...prev, hasSeededData: true } : { hasSeededData: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'seeding_initial_data');
     }
@@ -198,8 +202,9 @@ export default function App() {
       });
       setProjects(items);
       
-      // Auto seed initial backup projects to empty databases
-      if (snapshot.empty && snapshot.metadata.fromCache === false) {
+      // Auto-seed only on first setup when userProfile has no seeding tracker flag.
+      // Deleting all projects subsequently will not trigger a re-seed.
+      if (snapshot.empty && snapshot.metadata.fromCache === false && userProfile && !userProfile.hasSeededData) {
         seedDefaultData(uid);
       }
     }, (error) => {
@@ -245,7 +250,7 @@ export default function App() {
       unsubscribeMaterials();
       unsubscribeTransactions();
     };
-  }, [user]);
+  }, [user, userProfile]);
 
   // Sync settings actions back to User Profiles
   const saveSettings = async (newSettings: AppSettings) => {
