@@ -3,7 +3,15 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+// Use environment variables for sensitive fields to prevent GitHub hardcoding security warnings,
+// falling back to firebase-applet-config.json values if not provided as environment variables.
+const resolvedFirebaseConfig = {
+  ...firebaseConfig,
+  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || 
+          (firebaseConfig.apiKey && !firebaseConfig.apiKey.includes('PLACEHOLDER') ? firebaseConfig.apiKey : ''),
+};
+
+const app = initializeApp(resolvedFirebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth();
 
