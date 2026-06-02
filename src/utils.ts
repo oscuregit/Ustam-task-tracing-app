@@ -45,15 +45,75 @@ export function getTranslatedLabel(key: string, lang: 'tr' | 'en'): string {
 }
 
 /**
- * Consistently format date inputs into Day / Month / Year format (DD.MM.YYYY or DD/MM/YYYY)
+ * Consistently format date inputs into Day / Month / Year format (DD/MM/YYYY)
  */
 export function formatDate(dateString: string, lang: 'tr' | 'en' = 'tr'): string {
   if (!dateString) return '';
-  const d = new Date(dateString);
+  
+  let d: Date;
+  
+  if (typeof dateString === 'string') {
+    if (dateString.includes('-')) {
+      const parts = dateString.split('-');
+      if (parts.length === 3) {
+        // Handle "YYYY-MM-DD" safely without timezone offset shift
+        if (parts[0].length === 4) {
+          const year = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10);
+          const day = parseInt(parts[2], 10);
+          d = new Date(year, month - 1, day);
+        } else {
+          d = new Date(dateString);
+        }
+      } else {
+        d = new Date(dateString);
+      }
+    } else if (dateString.includes('.')) {
+      const parts = dateString.split('.');
+      if (parts.length === 3) {
+        // Handle "DD.MM.YYYY"
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        d = new Date(year, month - 1, day);
+      } else {
+        d = new Date(dateString);
+      }
+    } else if (dateString.includes('/')) {
+      const parts = dateString.split('/');
+      if (parts.length === 3) {
+        // Since we are formatting to DD/MM/YYYY, assume inputs with slashes are formatted similarly or check safely
+        const token1 = parseInt(parts[0], 10);
+        const token2 = parseInt(parts[1], 10);
+        const token3 = parseInt(parts[2], 10);
+        if (token3 > 1000) {
+          // It's DD/MM/YYYY or MM/DD/YYYY
+          if (token1 > 12) {
+            // Must be DD/MM/YYYY
+            d = new Date(token3, token2 - 1, token1);
+          } else {
+            // Ambiguous but respect user's requested day/month/year priority
+            d = new Date(token3, token2 - 1, token1);
+          }
+        } else {
+          d = new Date(dateString);
+        }
+      } else {
+        d = new Date(dateString);
+      }
+    } else {
+      d = new Date(dateString);
+    }
+  } else {
+    d = new Date(dateString);
+  }
+
   if (isNaN(d.getTime())) return dateString;
+  
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
-  return lang === 'en' ? `${day}/${month}/${year}` : `${day}.${month}.${year}`;
+  
+  return `${day}/${month}/${year}`;
 }
 
