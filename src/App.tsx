@@ -74,7 +74,8 @@ export default function App() {
     budgetWarningThreshold: 90,
     autoSyncMaterialToLedger: true,
     decimalPlaces: 0,
-    showWelcomeBanner: true
+    showWelcomeBanner: true,
+    dateFormat: 'DD/MM/YYYY'
   });
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');

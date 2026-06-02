@@ -82,6 +82,7 @@ export interface AppSettings {
   autoSyncMaterialToLedger: boolean;
   decimalPlaces: 0 | 2;
   showWelcomeBanner: boolean;
+  dateFormat?: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' | 'DD.MM.YYYY';
 }
 
 export interface AccountingSummary {

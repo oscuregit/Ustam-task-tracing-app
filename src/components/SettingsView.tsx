@@ -85,6 +85,9 @@ export default function SettingsView({
       timezoneLabel: { tr: 'Zaman Dilimi', en: 'Timezone' },
       timezoneDesc: { tr: 'Görev teslim tarihleri ve işlem saat dilimi ayarı.', en: 'Used for task deadlines and ledger logs timezone.' },
       
+      dateFormatLabel: { tr: 'Tarih Formatı', en: 'Date Format' },
+      dateFormatDesc: { tr: 'Uygulamadaki tüm tarih görünümlerinin biçimlendirilme standardı.', en: 'Standard formatting for all date displays in the application.' },
+      
       themeLabel: { tr: 'Görünüm Modu', en: 'Theme Mode' },
       themeDesc: { tr: 'Görüntüleme modunu açık veya karanlık olarak ayarlayın.', en: 'Toggle application theme between light and dark.' },
       themeLight: { tr: 'Aydınlık Şablon', en: 'Light Template' },
@@ -409,6 +412,24 @@ export default function SettingsView({
                     {tz.label}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            {/* Date Format dropdown */}
+            <div className="flex justify-between items-start gap-4 pt-3 border-t border-slate-100">
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-slate-800">{t('dateFormatLabel')}</label>
+                <p className="text-xs text-slate-400">{t('dateFormatDesc')}</p>
+              </div>
+              <select
+                value={settings.dateFormat || 'DD/MM/YYYY'}
+                onChange={(e) => updateSetting('dateFormat', e.target.value as any)}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 max-w-[180px] focus:ring-1 focus:ring-blue-600 outline-hidden cursor-pointer font-mono"
+              >
+                <option value="DD/MM/YYYY">DD/MM/YYYY (02/06/2026)</option>
+                <option value="DD.MM.YYYY">DD.MM.YYYY (02.06.2026)</option>
+                <option value="MM/DD/YYYY">MM/DD/YYYY (06/02/2026)</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD (2026-06-02)</option>
               </select>
             </div>
           </div>

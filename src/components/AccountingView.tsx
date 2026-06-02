@@ -906,7 +906,7 @@ export default function AccountingView({
                   return (
                     <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
                       <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap font-mono">
-                        {formatDate(t.date, activeSettings.lang)}
+                        {formatDate(t.date, activeSettings)}
                       </td>
                       <td className="py-3.5 px-4 font-semibold text-slate-600 dark:text-slate-350 max-w-[150px] truncate" title={correlatedProj}>
                         {correlatedProj}

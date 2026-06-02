@@ -45,12 +45,17 @@ export function getTranslatedLabel(key: string, lang: 'tr' | 'en'): string {
 }
 
 /**
- * Consistently format date inputs into Day / Month / Year format (DD/MM/YYYY)
+ * Consistently format date inputs into custom user format or standard Day / Month / Year format (DD/MM/YYYY)
  */
-export function formatDate(dateString: string, lang: 'tr' | 'en' = 'tr'): string {
+export function formatDate(dateString: string, langOrSettings?: 'tr' | 'en' | AppSettings): string {
   if (!dateString) return '';
   
   let d: Date;
+  let dateFormat = 'DD/MM/YYYY';
+
+  if (langOrSettings && typeof langOrSettings === 'object') {
+    dateFormat = langOrSettings.dateFormat || 'DD/MM/YYYY';
+  }
   
   if (typeof dateString === 'string') {
     if (dateString.includes('-')) {
@@ -114,6 +119,48 @@ export function formatDate(dateString: string, lang: 'tr' | 'en' = 'tr'): string
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
   
+  if (dateFormat === 'MM/DD/YYYY') {
+    return `${month}/${day}/${year}`;
+  } else if (dateFormat === 'YYYY-MM-DD') {
+    return `${year}-${month}-${day}`;
+  } else if (dateFormat === 'DD.MM.YYYY') {
+    return `${day}.${month}.${year}`;
+  }
+  
   return `${day}/${month}/${year}`;
+}
+
+/**
+ * Converts a DD/MM/YYYY text input format back to standard YYYY-MM-DD for database storage and sorting.
+ * If the input doesn't match DD/MM/YYYY, it attempts standard parsing or returns original.
+ */
+export function toDbDate(displayString: string): string {
+  if (!displayString) return '';
+  const trimmed = displayString.trim();
+  
+  // If it's already YYYY-MM-DD, return it
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  
+  // Handle DD/MM/YYYY or DD.MM.YYYY
+  const match = trimmed.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+  if (match) {
+    const day = match[1].padStart(2, '0');
+    const month = match[2].padStart(2, '0');
+    const year = match[3];
+    return `${year}-${month}-${day}`;
+  }
+  
+  // Fallback to parsing as Date
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${year}-${month}-${day}`;
+  }
+  
+  return trimmed;
 }
 

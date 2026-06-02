@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Project, ProjectStatus, Task, TaskPriority, TaskStatus, AppSettings, Transaction } from '../types';
-import { formatMoney, formatDate } from '../utils';
+import { formatMoney, formatDate, toDbDate } from '../utils';
 import { 
   Building2, 
   Calendar, 
@@ -145,7 +145,7 @@ export default function ProjectsView({
     setProjBudget(10000);
     setProjStatus('planning');
     setProjStart(new Date().toISOString().split('T')[0]);
-    setProjTarget('');
+    setProjTarget(new Date().toISOString().split('T')[0]);
     setIsProjectModalOpen(true);
   };
 
@@ -156,8 +156,8 @@ export default function ProjectsView({
     setProjDesc(p.description);
     setProjBudget(p.allocatedBudget);
     setProjStatus(p.status);
-    setProjStart(p.startDate);
-    setProjTarget(p.targetDate);
+    setProjStart(p.startDate || '');
+    setProjTarget(p.targetDate || '');
     setIsProjectModalOpen(true);
   };
 
@@ -224,7 +224,7 @@ export default function ProjectsView({
     setTaskDesc(t.description);
     setTaskPriority(t.priority);
     setTaskStatus(t.status);
-    setTaskDueDate(t.dueDate);
+    setTaskDueDate(t.dueDate || '');
     setTaskUsta(t.assignedTo || '');
     setLinkFinance(false);
     setIsTaskModalOpen(true);
@@ -234,6 +234,8 @@ export default function ProjectsView({
     e.preventDefault();
     if (!taskTitle.trim() || !activeProjectId) return;
 
+    const parsedDueDate = taskDueDate;
+
     if (editingTask) {
       onUpdateTask({
         ...editingTask,
@@ -241,7 +243,7 @@ export default function ProjectsView({
         description: taskDesc,
         priority: taskPriority,
         status: taskStatus,
-        dueDate: taskDueDate,
+        dueDate: parsedDueDate,
         assignedTo: taskUsta || undefined,
       });
     } else {
@@ -251,7 +253,7 @@ export default function ProjectsView({
         description: taskDesc,
         priority: taskPriority,
         status: taskStatus,
-        dueDate: taskDueDate,
+        dueDate: parsedDueDate,
         assignedTo: taskUsta || undefined,
       });
 
@@ -262,7 +264,7 @@ export default function ProjectsView({
           type: financeType,
           category: financeCategory,
           amount: Number(financeAmount),
-          date: taskDueDate || new Date().toISOString().split('T')[0],
+          date: parsedDueDate || new Date().toISOString().split('T')[0],
           paymentMethod: financePaymentMethod,
           notes: `Yeni görev açılırken otomatik atanan bütçe hareketi. Görev: ${taskTitle}`
         });
@@ -478,13 +480,13 @@ export default function ProjectsView({
                 <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
                   <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{isEn ? 'Planned Start' : 'Planlanan Başlama'}</span>
                   <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" /> {formatDate(activeProject.startDate, activeSettings.lang)}
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" /> {formatDate(activeProject.startDate, activeSettings)}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
                   <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{isEn ? 'Due Date' : 'Teslim Tarihi'}</span>
                   <span className="font-bold text-red-650 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> {formatDate(activeProject.targetDate, activeSettings.lang)}
+                    <Clock className="w-3.5 h-3.5" /> {formatDate(activeProject.targetDate, activeSettings)}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
@@ -548,6 +550,7 @@ export default function ProjectsView({
                         priorityLabel={getPriorityLabel}
                         nextStatusLabel="Çalışmayı Başlat"
                         lang={activeSettings.lang}
+                        settings={activeSettings}
                       />
                     ))
                   )}
@@ -583,6 +586,7 @@ export default function ProjectsView({
                         priorityLabel={getPriorityLabel}
                         nextStatusLabel="Tamamlandı Olarak İşaretle"
                         lang={activeSettings.lang}
+                        settings={activeSettings}
                       />
                     ))
                   )}
@@ -618,6 +622,7 @@ export default function ProjectsView({
                         isCompleted
                         onShiftStatusBack={(t) => handleStatusShift(t, 'doing')}
                         lang={activeSettings.lang}
+                        settings={activeSettings}
                       />
                     ))
                   )}
@@ -714,7 +719,7 @@ export default function ProjectsView({
                       id="proj-modal-input-status"
                       value={projStatus}
                       onChange={(e) => setProjStatus(e.target.value as ProjectStatus)}
-                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 block bg-slate-50/30 transition-all cursor-pointer"
+                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 block bg-slate-50/30 transition-all cursor-pointer font-sans text-slate-800 dark:text-white"
                     >
                       <option value="planning">{isEn ? 'Planning' : 'Planlama'}</option>
                       <option value="ongoing">{isEn ? 'Ongoing' : 'Devam Ediyor'}</option>
@@ -726,25 +731,29 @@ export default function ProjectsView({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Başlangıç Tarihi</label>
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">
+                      {isEn ? 'Start Date' : 'Başlangıç Tarihi'}
+                    </label>
                     <input 
                       type="date" 
                       required
                       id="proj-modal-input-start"
                       value={projStart}
                       onChange={(e) => setProjStart(e.target.value)}
-                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30"
+                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30 font-mono text-slate-800 dark:text-white"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Bitiş Hedefi</label>
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">
+                      {isEn ? 'Target Date (Delivery)' : 'Bitiş Hedefi (Teslim)'}
+                    </label>
                     <input 
                       type="date" 
                       required
                       id="proj-modal-input-target"
                       value={projTarget}
                       onChange={(e) => setProjTarget(e.target.value)}
-                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30"
+                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30 font-mono text-slate-800 dark:text-white"
                     />
                   </div>
                 </div>
@@ -860,7 +869,7 @@ export default function ProjectsView({
                       id="task-modal-input-duedate"
                       value={taskDueDate}
                       onChange={(e) => setTaskDueDate(e.target.value)}
-                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30"
+                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30 font-mono text-slate-800 dark:text-white"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1068,6 +1077,7 @@ interface TaskCardProps {
   isCompleted?: boolean;
   nextStatusLabel?: string;
   lang?: 'tr' | 'en';
+  settings?: AppSettings;
 }
 
 function TaskCard({
@@ -1080,7 +1090,8 @@ function TaskCard({
   priorityLabel,
   isCompleted = false,
   nextStatusLabel,
-  lang = 'tr'
+  lang = 'tr',
+  settings
 }: TaskCardProps) {
   return (
     <div className={`p-4 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all space-y-3 relative group overflow-hidden ${
@@ -1122,7 +1133,7 @@ function TaskCard({
 
       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
         <span className="flex items-center gap-1 font-mono text-[10px]">
-          <Calendar className="w-3.5 h-3.5 text-slate-450" /> {formatDate(task.dueDate, lang)}
+          <Calendar className="w-3.5 h-3.5 text-slate-450" /> {formatDate(task.dueDate, settings || lang)}
         </span>
         {task.assignedTo && (
           <span className="font-semibold text-slate-650 flex items-center gap-0.5 truncate max-w-[120px]" title={task.assignedTo}>

@@ -353,7 +353,7 @@ export default function Dashboard({
                         </div>
                         <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                           <span className="flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" /> {formatDate(p.targetDate, activeSettings?.lang || 'tr')}
+                            <Calendar className="w-3.5 h-3.5" /> {formatDate(p.targetDate, activeSettings)}
                           </span>
                           <span className={`${daysLeft < 0 ? 'text-red-500 font-bold' : daysLeft <= 10 ? 'text-rose-650 font-semibold' : 'text-slate-500 dark:text-slate-400'}`}>
                             {daysLeft < 0 
@@ -431,7 +431,7 @@ export default function Dashboard({
                         
                         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/55">
                           <span className="flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" /> {formatDate(t.dueDate, activeSettings?.lang || 'tr')}
+                            <Calendar className="w-3.5 h-3.5" /> {formatDate(t.dueDate, activeSettings)}
                           </span>
                           <span className="font-medium text-slate-600 truncate max-w-[100px]" title={t.assignedTo}>
                             {t.assignedTo || 'Usta Belirtilmemiş'}
