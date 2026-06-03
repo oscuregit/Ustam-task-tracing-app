@@ -20,12 +20,16 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 interface LoginViewProps {
-  lang: 'tr' | 'en';
+  lang: 'tr' | 'en' | 'pl';
   onAuthSuccess?: () => void;
 }
 
 export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
-  const isEn = lang === 'en';
+  const t = (en: string, tr: string, pl: string) => {
+    if (lang === 'tr') return tr;
+    if (lang === 'pl') return pl;
+    return en;
+  };
   
   // Custom auth states
   const [isSignUp, setIsSignUp] = useState(false);
@@ -56,10 +60,10 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
         // Create new Profile record for Google user
         await setDoc(userDocRef, {
           uid: firebaseUser.uid,
-          name: firebaseUser.displayName || 'Usta Kullanıcı',
+          name: firebaseUser.displayName || t('Master User', 'Usta Kullanıcı', 'Mistrzowski Użytkownik'),
           email: firebaseUser.email || '',
-          role: isEn ? 'Renovation Lead' : 'Tadilat Sorumlusu',
-          company: isEn ? 'Freelance Site' : 'Serbest / Bireysel Şantiye',
+          role: t('Renovation Lead', 'Tadilat Sorumlusu', 'Kierownik Remontu'),
+          company: t('Freelance Site', 'Serbest / Bireysel Şantiye', 'Niezależna Budowa'),
           avatarUrl: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=120',
           expenseCategories: [
             'Kaba İnşaat',
@@ -96,7 +100,7 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
       if (onAuthSuccess) onAuthSuccess();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(isEn ? 'Google Sign-In failed: ' + err.message : 'Google ile giriş başarısız: ' + err.message);
+      setErrorMsg(t('Google Sign-In failed: ', 'Google ile giriş başarısız: ', 'Logowanie Google nie powiodło się: ') + err.message);
     } finally {
       setLoading(false);
     }
@@ -106,11 +110,11 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
-      setErrorMsg(isEn ? 'Email and Password are required.' : 'E-posta ve şifre girilmesi zorunludur.');
+      setErrorMsg(t('Email and Password are required.', 'E-posta ve şifre girilmesi zorunludur.', 'E-mail i hasło są wymagane.'));
       return;
     }
     if (isSignUp && !username.trim()) {
-      setErrorMsg(isEn ? 'Name details must be filled for signing up.' : 'Kayıt için ad soyad girilmesi zorunludur.');
+      setErrorMsg(t('Name details must be filled for signing up.', 'Kayıt için ad soyad girilmesi zorunludur.', 'Szczegóły imienia muszą być uzupełnione do rejestracji.'));
       return;
     }
     
@@ -127,8 +131,8 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
           uid: uid,
           name: username.trim(),
           email: email.trim(),
-          role: role.trim() || (isEn ? 'Site Supervisor' : 'Şantiye Şefi'),
-          company: company.trim() || (isEn ? 'Independent Contractor' : 'Müteahhit / Bireysel Ustalar'),
+          role: role.trim() || t('Site Supervisor', 'Şantiye Şefi', 'Kierownik Budowy'),
+          company: company.trim() || t('Independent Contractor', 'Müteahhit / Bireysel Ustalar', 'Niezależny Wykonawca'),
           avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=120',
           expenseCategories: [
             'Kaba İnşaat',
@@ -168,15 +172,25 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
       if (onAuthSuccess) onAuthSuccess();
     } catch (err: any) {
       console.error(err);
-      let turkishError = err.message;
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        turkishError = 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.';
-      } else if (err.code === 'auth/email-already-in-use') {
-        turkishError = 'Bu e-posta adresi zaten kullanımda.';
-      } else if (err.code === 'auth/weak-password') {
-        turkishError = 'Şifreniz çok zayıf. En az 6 karakter girin.';
+      let localizedError = err.message;
+      if (lang === 'tr') {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          localizedError = 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.';
+        } else if (err.code === 'auth/email-already-in-use') {
+          localizedError = 'Bu e-posta adresi zaten kullanımda.';
+        } else if (err.code === 'auth/weak-password') {
+          localizedError = 'Şifreniz çok zayıf. En az 6 karakter girin.';
+        }
+      } else if (lang === 'pl') {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          localizedError = 'Nieprawidłowy e-mail lub hasło. Spróbuj ponownie.';
+        } else if (err.code === 'auth/email-already-in-use') {
+          localizedError = 'Ten adres e-mail jest już zajęty.';
+        } else if (err.code === 'auth/weak-password') {
+          localizedError = 'Twoje hasło jest za słabe. Wpisz przynajmniej 6 znaków.';
+        }
       }
-      setErrorMsg(isEn ? err.message : turkishError);
+      setErrorMsg(localizedError);
     } finally {
       setLoading(false);
     }
@@ -192,10 +206,10 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
             🔨
           </div>
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            {isEn ? 'Ustam Renovation Hub' : 'Ustam Şantiye Paneli'}
+            {t('Ustam Renovation Hub', 'Ustam Şantiye Paneli', 'Portal Remontowy Ustam')}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            {isEn ? 'Secure Production Access' : 'Bulut veritabanı destekli güvenli canlı şantiye paneli.'}
+            {t('Secure Production Access', 'Bulut veritabanı destekli güvenli canlı şantiye paneli.', 'Zabezpieczony dostęp do projektów w chmurze.')}
           </p>
         </div>
 
@@ -211,7 +225,7 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
           <div className="flex flex-col items-center justify-center py-4 space-y-2 text-slate-500 dark:text-slate-400">
             <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
             <div className="text-xs font-medium">
-              {isEn ? 'Connecting securely to the cloud...' : 'Bulut sunucusuna güvenli bağlantı kuruluyor...'}
+              {t('Connecting securely to the cloud...', 'Bulut sunucusuna güvenli bağlantı kuruluyor...', 'Łączenie z bazą danych w chmurze...')}
             </div>
           </div>
         )}
@@ -229,15 +243,15 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
                   fill="#EA4335"
-                  d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.41 0-6.182-2.77-6.182-6.182 0-3.41 2.771-6.182 6.182-6.182 1.554 0 2.924.582 3.972 1.537l3.075-3.075C19.123 2.146 15.932 1 12.24 1 6.033 1 1 6.033 1 12.24s5.033 11.24 11.24 11.24c5.899 0 10.9-4.237 10.9-11.24 0-.649-.079-1.21-.194-1.955H12.24z"
+                  d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.41 0-6.182-2.77-6.182-6.182 0-3.41 2.771-6.182 6.182-6.182 1.554 0 2.924.582 3.972 1.537l3.075-3.075C19.123 2.146 15.932 1 12.24 1 6.033 1 12.24s5.033 11.24 11.24 11.24c5.899 0 10.9-4.237 10.9-11.24 0-.649-.079-1.21-.194-1.955H12.24z"
                 />
               </svg>
-              {isEn ? 'Continue with Google' : 'Google Hesabı ile Giriş Yap'}
+              {t('Continue with Google', 'Google Hesabı ile Giriş Yap', 'Kontynuuj z Google')}
             </button>
 
             <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-              <span className="flex-shrink mx-4 text-[10px] text-slate-450 font-bold uppercase tracking-widest">{isEn ? 'or' : 'veya'}</span>
+              <span className="flex-shrink mx-4 text-[10px] text-slate-450 font-bold uppercase tracking-widest">{t('or', 'veya', 'lub')}</span>
               <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
             </div>
 
@@ -247,7 +261,7 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
                 <>
                   <div className="space-y-1.5 animate-fadeIn">
                     <label className="text-xs font-bold text-slate-600 dark:text-slate-450 uppercase">
-                      {isEn ? 'Your Full Name *' : 'Ad Soyadınız *'}
+                      {t('Your Full Name *', 'Ad Soyadınız *', 'Imię i nazwisko *')}
                     </label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 pointer-events-none">
@@ -267,11 +281,11 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
                   <div className="grid grid-cols-2 gap-3 animate-fadeIn">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-600 dark:text-slate-450 uppercase">
-                        {isEn ? 'Role / Title' : 'Mesleki Rol'}
+                        {t('Role / Title', 'Mesleki Rol', 'Rola / Stanowisko')}
                       </label>
                       <input
                         type="text"
-                        placeholder={isEn ? 'Contractor' : 'Tadilat Şefi'}
+                        placeholder={t('Contractor', 'Tadilat Şefi', 'Wykonawca')}
                         value={role}
                         onChange={(e) => setRole(e.target.value)}
                         className="w-full text-sm px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-amber-500 dark:text-white"
@@ -280,7 +294,7 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-600 dark:text-slate-450 uppercase">
-                        {isEn ? 'Company' : 'Şirket Adı'}
+                        {t('Company', 'Şirket Adı', 'Firma')}
                       </label>
                       <div className="relative">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 pointer-events-none">
@@ -301,7 +315,7 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-600 dark:text-slate-450 uppercase">
-                  {isEn ? 'Email Address *' : 'E-Posta Adresiniz *'}
+                  {t('Email Address *', 'E-Posta Adresiniz *', 'Adres e-mail *')}
                 </label>
                 <input
                   type="email"
@@ -315,7 +329,7 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-600 dark:text-slate-450 uppercase">
-                  {isEn ? 'Password' : 'Giriş Şifresi'}
+                  {t('Password', 'Giriş Şifresi', 'Hasło')}
                 </label>
                 <div className="relative">
                   <input
@@ -342,8 +356,8 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
               >
                 <LogIn className="w-4 h-4" />
                 {isSignUp 
-                  ? (isEn ? 'Create Cloud Account & Sign In' : 'Üye Ol ve Giriş Yap') 
-                  : (isEn ? 'Sign In with Email' : 'Giriş Yap')
+                  ? t('Create Cloud Account & Sign In', 'Üye Ol ve Giriş Yap', 'Załóż konto i zaloguj się') 
+                  : t('Sign In with Email', 'Giriş Yap', 'Zaloguj się')
                 }
               </button>
               
@@ -354,8 +368,8 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
                   className="text-amber-500 hover:text-amber-600 hover:underline font-bold focus:outline-none"
                 >
                   {isSignUp 
-                    ? (isEn ? 'Already have an account? Sign In' : 'Zaten hesabınız var mı? Giriş Yapın') 
-                    : (isEn ? 'Don\'t have an account yet? Register' : 'Henüz hesabınız yok mu? Kaydolun')
+                    ? t('Already have an account? Sign In', 'Zaten hesabınız var mı? Giriş Yapın', 'Masz już konto? Zaloguj się') 
+                    : t('Don\'t have an account yet? Register', 'Henüz hesabınız yok mu? Kaydolun', 'Nie masz jeszcze konta? Zarejestruj się')
                   }
                 </button>
               </div>
@@ -365,7 +379,7 @@ export default function LoginView({ lang, onAuthSuccess }: LoginViewProps) {
 
         <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold border-t border-slate-100 dark:border-slate-800 pt-4">
           <ShieldCheck className="w-3.5 h-3.5 text-green-500" />
-          <span>{isEn ? 'Firestore Secure Cloud' : 'Bulut Veritabanı Korumalı'}</span>
+          <span>{t('Firestore Secure Cloud', 'Bulut Veritabanı Korumalı', 'Zabezpieczone przez Firestore')}</span>
         </div>
 
       </div>

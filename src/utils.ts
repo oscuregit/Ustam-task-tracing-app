@@ -18,7 +18,7 @@ export function getCurrencySymbol(currency: 'TRY' | 'USD' | 'EUR' | 'PLN'): stri
  */
 export function formatMoney(val: number, settings: AppSettings): string {
   const symbol = getCurrencySymbol(settings.currency);
-  const locale = settings.lang === 'tr' ? 'tr-TR' : 'en-US';
+  const locale = settings.lang === 'tr' ? 'tr-TR' : (settings.lang === 'pl' ? 'pl-PL' : 'en-US');
   
   const formattedValue = val.toLocaleString(locale, {
     minimumFractionDigits: settings.decimalPlaces,
@@ -32,22 +32,22 @@ export function formatMoney(val: number, settings: AppSettings): string {
 /**
  * Lightweight translation helper for navigating primary titles or menus.
  */
-export function getTranslatedLabel(key: string, lang: 'tr' | 'en'): string {
-  const dict: Record<string, { tr: string; en: string }> = {
-    dashboard: { tr: 'Genel Kontrol Paneli', en: 'Dashboard Overview' },
-    projects: { tr: 'Projeler & Görevler', en: 'Projects & Tasks' },
-    budget: { tr: 'Bütçe & Malzemeler', en: 'Budget & Materials' },
-    accounting: { tr: 'Muhasebe Defteri', en: 'Accounting Ledger' },
-    settings: { tr: 'Uygulama Ayarları', en: 'System Settings' },
+export function getTranslatedLabel(key: string, lang: 'tr' | 'en' | 'pl'): string {
+  const dict: Record<string, { tr: string; en: string; pl: string }> = {
+    dashboard: { tr: 'Genel Kontrol Paneli', en: 'Dashboard Overview', pl: 'Panel Główny' },
+    projects: { tr: 'Projeler & Görevler', en: 'Projects & Tasks', pl: 'Projekty i Zadania' },
+    budget: { tr: 'Bütçe & Malzemeler', en: 'Budget & Materials', pl: 'Budżet i Materiały' },
+    accounting: { tr: 'Muhasebe Defteri', en: 'Accounting Ledger', pl: 'Księga Rachunkowa' },
+    settings: { tr: 'Uygulama Ayarları', en: 'System Settings', pl: 'Ustawienia Systemu' },
   };
   
-  return dict[key] ? (lang === 'en' ? dict[key].en : dict[key].tr) : key;
+  return dict[key] ? dict[key][lang] : key;
 }
 
 /**
  * Consistently format date inputs into custom user format or standard Day / Month / Year format (DD/MM/YYYY)
  */
-export function formatDate(dateString: string, langOrSettings?: 'tr' | 'en' | AppSettings): string {
+export function formatDate(dateString: string, langOrSettings?: 'tr' | 'en' | 'pl' | AppSettings): string {
   if (!dateString) return '';
   
   let d: Date;
@@ -163,4 +163,41 @@ export function toDbDate(displayString: string): string {
   
   return trimmed;
 }
+
+/**
+ * Dynamic mapping to translate database category names to selected system language on-the-fly.
+ */
+export function translateCategory(cat: string, lang: 'tr' | 'en' | 'pl'): string {
+  if (!cat) return cat;
+  const dict: Record<string, { tr: string; en: string; pl: string }> = {
+    // Expense / Material Categories
+    'Kaba İnşaat': { tr: 'Kaba İnşaat', en: 'Rough Construction', pl: 'Stan surowy' },
+    'Kaba İnşaat Malzemesi': { tr: 'Kaba İnşaat Malzemesi', en: 'Rough Construction Material', pl: 'Materiały stanu surowego' },
+    'Tesisat (Elektrik/Su)': { tr: 'Tesisat (Elektrik/Su)', en: 'Plumbing & Electrical', pl: 'Instalacje (elektr./wod.)' },
+    'Tesisat & Altyapı': { tr: 'Tesisat & Altyapı', en: 'Plumbing & Infrastructure', pl: 'Instalacje i infrastruktura' },
+    'Zemin & Seramik': { tr: 'Zemin & Seramik', en: 'Flooring & Ceramics', pl: 'Podłogi i ceramika' },
+    'Boya & Badana': { tr: 'Boya & Badana', en: 'Painting & Plastering', pl: 'Malowanie i gładź' },
+    'Aydınlatma & Elektrik': { tr: 'Aydınlatma & Elektrik', en: 'Lighting & Electrical', pl: 'Oświetlenie i elektryka' },
+    'Aydınlatma & Aksesuar': { tr: 'Aydınlatma & Aksesuar', en: 'Lighting & Accessories', pl: 'Oświetlenie i akcesoria' },
+    'Mobilya & Dolap': { tr: 'Mobilya & Dolap', en: 'Furniture & Cabinets', pl: 'Meble i szafki' },
+    'Mobilya & Dolap Kapakları': { tr: 'Mobilya & Dolap Kapakları', en: 'Furniture & Cabinet Doors', pl: 'Meble i fronty szafek' },
+    'Hizmet & İşçilik': { tr: 'Hizmet & İşçilik', en: 'Labour & Services', pl: 'Robocizna i usługi' },
+    'Usta İşçilik & Hizmet': { tr: 'Usta İşçilik & Hizmet', en: 'Labour & Craftsmanship', pl: 'Robocizna i usługi rzemieślnicze' },
+    'Taşıma & Nakliye & Moloz': { tr: 'Taşıma & Nakliye & Moloz', en: 'Transport & Rubble Disposal', pl: 'Transport i wywóz gruzu' },
+    'Ruhsat & Belediye & Harç': { tr: 'Ruhsat & Belediye & Harç', en: 'Permit & Municipality Fees', pl: 'Pozwolenia i opłaty' },
+    'Diğer': { tr: 'Diğer', en: 'Other', pl: 'Inne' },
+    'Diğer Giderler': { tr: 'Diğer Giderler', en: 'Other Expenses', pl: 'Inne wydatki' },
+    
+    // Income Categories
+    'Bütçe Aktarımı': { tr: 'Bütçe Aktarımı', en: 'Budget Allocation', pl: 'Przelew budżetowy' },
+    'Banka Kredisi': { tr: 'Banka Kredisi', en: 'Bank Loan', pl: 'Kredyt bankowy' },
+    'Ortak Sermaye': { tr: 'Ortak Sermaye', en: 'Shared Capital', pl: 'Wspólny kapitał' },
+    'Yedek Akçe': { tr: 'Yedek Akçe', en: 'Emergency Reserves', pl: 'Rezerwa awaryjna' },
+    'Müşteri Hak Edişi': { tr: 'Müşteri Hak Edişi', en: 'Client Progress Payment', pl: 'Płatność od klienta' },
+    'Diğer Gelirler': { tr: 'Diğer Gelirler', en: 'Other Incomes', pl: 'Inne przychody' }
+  };
+  
+  return dict[cat] ? dict[cat][lang] : cat;
+}
+
 

@@ -73,7 +73,7 @@ export interface MaterialCategorySummary {
 }
 
 export interface AppSettings {
-  lang: 'tr' | 'en';
+  lang: 'tr' | 'en' | 'pl';
   currency: 'TRY' | 'USD' | 'EUR' | 'PLN';
   theme: 'light' | 'dark';
   timezone: string;

@@ -60,6 +60,11 @@ export default function ProjectsView({
   };
 
   const isEn = activeSettings.lang === 'en';
+  const t = (en: string, tr: string, pl: string) => {
+    if (activeSettings.lang === 'pl') return pl;
+    if (activeSettings.lang === 'tr') return tr;
+    return en;
+  };
   // Set selected project state
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     initialSelectedProjectId || (projects.length > 0 ? projects[0].id : null)
@@ -303,18 +308,18 @@ export default function ProjectsView({
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       {/* LEFT COLUMN: Project Selector List */}
-      <div className="w-full lg:w-80 flex-shrink-0 space-y-4">
+      <div className="w-full lg:w-80 flex-shrink-0 space-y-4 font-sans">
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
           <h2 className="font-semibold text-slate-800 text-base flex items-center gap-2">
-            <Briefcase className="w-4 h-4 text-slate-500" /> Projeler
+            <Briefcase className="w-4 h-4 text-slate-500" /> {t('Projects', 'Projeler', 'Projekty')}
           </h2>
           <button 
             id="proj-add-badge-btn"
             onClick={handleOpenAddProject}
             className="p-1.5 bg-amber-500 hover:bg-amber-600 rounded-lg text-slate-950 hover:scale-105 transition-transform flex items-center gap-1 text-xs font-semibold cursor-pointer"
-            title="Yeni Proje Ekle"
+            title={t('Add New Project', 'Yeni Proje Ekle', 'Dodaj nowy projekt')}
           >
-            <Plus className="w-3.5 h-3.5" /> Ekle
+            <Plus className="w-3.5 h-3.5" /> {t('Add', 'Ekle', 'Dodaj')}
           </button>
         </div>
 
@@ -322,11 +327,11 @@ export default function ProjectsView({
         <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-2xs flex flex-wrap gap-1">
           {['all', 'planning', 'ongoing', 'completed', 'suspended'].map((status) => {
             const label = {
-              all: 'Tümü',
-              planning: 'Planlanan',
-              ongoing: 'Aktif',
-              completed: 'Biten',
-              suspended: 'Durdurulan'
+              all: t('All', 'Tümü', 'Wszystkie'),
+              planning: t('Planning', 'Planlanan', 'Planowane'),
+              ongoing: t('Active', 'Aktif', 'Aktywne'),
+              completed: t('Completed', 'Biten', 'Zakończone'),
+              suspended: t('Suspended', 'Durdurulan', 'Wstrzymane')
             }[status];
 
             const isActive = projectStatusFilter === status;
@@ -351,7 +356,7 @@ export default function ProjectsView({
         <div className="space-y-3 overflow-y-auto max-h-[500px]">
           {filteredProjects.length === 0 ? (
             <div className="bg-white p-6 rounded-xl border border-dashed border-slate-250 text-center text-slate-400 text-xs">
-              Eşleşen proje bulunamadı.
+              {t('No matching projects found.', 'Eşleşen proje bulunamadı.', 'Nie znaleziono pasujących projektów.')}
             </div>
           ) : (
             filteredProjects.map((p) => {
@@ -376,7 +381,7 @@ export default function ProjectsView({
                 >
                   <div className="space-y-2">
                     <div className="flex justify-between items-start gap-1">
-                      <h3 className="font-semibold text-slate-800 text-sm md:text-base group-hover:text-amber-600 transition-colors line-clamp-1">
+                      <h3 className="font-semibold text-slate-800 text-sm md:text-base group-hover:text-amber-600 transition-colors line-clamp-1 font-sans">
                         {p.name}
                       </h3>
                       <ChevronRight className={`w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform ${
@@ -394,16 +399,16 @@ export default function ProjectsView({
                         p.status === 'suspended' ? 'text-red-700 bg-red-50 border-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60' :
                         'text-slate-650'
                       }`}>
-                        {p.status === 'completed' ? (isEn ? 'Completed' : 'Tamamlandı') :
-                         p.status === 'ongoing' ? (isEn ? 'Ongoing' : 'Sürüyor') :
-                         p.status === 'suspended' ? (isEn ? 'Suspended' : 'Beklemede') : (isEn ? 'Planning' : 'Planlanıyor')}
+                        {p.status === 'completed' ? t('Completed', 'Tamamlandı', 'Zakończony') :
+                         p.status === 'ongoing' ? t('Ongoing', 'Sürüyor', 'W toku') :
+                         p.status === 'suspended' ? t('Suspended', 'Beklemede', 'Wstrzymany') : t('Planning', 'Planlanıyor', 'Planowany')}
                       </span>
                     </div>
 
                     {/* Progress slider mini */}
                     <div className="space-y-1 pt-1.5">
                       <div className="flex justify-between text-[9px] text-slate-400">
-                        <span>Görev İlerlemesi</span>
+                        <span>{t('Task Progress', 'Görev İlerlemesi', 'Postęp prac')}</span>
                         <span>{completedTasksPercent}%</span>
                       </div>
                       <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
@@ -434,7 +439,7 @@ export default function ProjectsView({
                     {activeProject.name}
                   </h1>
                   <span className="text-xs text-slate-450 font-medium font-mono">
-                    PROJE ID: {activeProject.id}
+                    {t('PROJECT ID:', 'PROJE ID:', 'PROJEKT ID:')} {activeProject.id}
                   </span>
                 </div>
 
@@ -444,7 +449,7 @@ export default function ProjectsView({
                     onClick={() => handleOpenEditProject(activeProject)}
                     className="p-2 text-slate-500 hover:text-amber-600 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors text-xs flex items-center gap-1 font-semibold cursor-pointer"
                   >
-                    <Edit3 className="w-4 h-4" /> Düzenle
+                    <Edit3 className="w-4 h-4" /> {t('Edit', 'Düzenle', 'Edytuj')}
                   </button>
                   <button 
                     id="proj-delete-action-btn"
@@ -457,7 +462,7 @@ export default function ProjectsView({
                       });
                     }}
                     className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                    title="Projeyi Sil"
+                    title={t('Delete Project', 'Projeyi Sil', 'Usuń Projekt')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -466,67 +471,67 @@ export default function ProjectsView({
 
               {/* Description text */}
               <p className="text-slate-600 dark:text-slate-350 text-sm leading-relaxed max-w-2xl bg-slate-50/50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800/60">
-                {activeProject.description || (isEn ? 'No description entered for this project yet.' : 'Bu proje için herhangi bir açıklama girilmemiştir.')}
+                {activeProject.description || t('No description entered for this project yet.', 'Bu proje için herhangi bir açıklama girilmemiştir.', 'Dla tego projektu nie wprowadzono jeszcze żadnego opisu.')}
               </p>
 
               {/* Dates & Budgets Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 text-xs">
                 <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{isEn ? 'Allocated Budget' : 'Ayrılan Bütçe'}</span>
+                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Allocated Budget', 'Ayrılan Bütçe', 'Przydzielony budżet')}</span>
                   <span className="font-bold text-slate-700 dark:text-slate-200 text-sm font-mono">
                     {formatMoney(activeProject.allocatedBudget, activeSettings)}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{isEn ? 'Planned Start' : 'Planlanan Başlama'}</span>
+                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Planned Start', 'Planlanan Başlama', 'Planowany start')}</span>
                   <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-slate-400" /> {formatDate(activeProject.startDate, activeSettings)}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{isEn ? 'Due Date' : 'Teslim Tarihi'}</span>
+                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Due Date', 'Teslim Tarihi', 'Termin realizacji')}</span>
                   <span className="font-bold text-red-650 flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" /> {formatDate(activeProject.targetDate, activeSettings)}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{isEn ? 'Project Status' : 'Proje Durumu'}</span>
+                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Project Status', 'Proje Durumu', 'Status projektu')}</span>
                   <span className={`font-bold uppercase tracking-wider text-[10px] ${
                     activeProject.status === 'completed' ? 'text-emerald-500' :
                     activeProject.status === 'ongoing' ? 'text-blue-550' :
                     activeProject.status === 'suspended' ? 'text-rose-500' : 'text-slate-500'
                   }`}>
-                    {activeProject.status === 'completed' ? (isEn ? 'Done' : 'Bitti') :
-                     activeProject.status === 'ongoing' ? (isEn ? 'Ongoing' : 'Devam Ediyor') :
-                     activeProject.status === 'suspended' ? (isEn ? 'Suspended' : 'Askıda') : (isEn ? 'Planning' : 'Planlama')}
+                    {activeProject.status === 'completed' ? t('Done', 'Bitti', 'Ukończono') :
+                     activeProject.status === 'ongoing' ? t('Ongoing', 'Devam Ediyor', 'W toku') :
+                     activeProject.status === 'suspended' ? t('Suspended', 'Askıda', 'Wstrzymany') : t('Planning', 'Planlama', 'Planowanie')}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Task Board Management Header */}
-            <div className="flex justify-between items-center mt-8 mb-4">
+            <div className="flex justify-between items-center mt-8 mb-4 font-sans">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <CheckCircle2 className="text-blue-500 w-5 h-5" /> Görev Panosu
+                <CheckCircle2 className="text-blue-500 w-5 h-5" /> {t('Task Kanban Board', 'Görev Panosu', 'Tablica zadań')}
               </h3>
               <button 
                 id="task-board-add-btn"
                 onClick={handleOpenAddTask}
                 className="flex items-center gap-1.5 bg-slate-905 hover:bg-slate-850 bg-slate-900 text-white font-medium px-3.5 py-2 rounded-xl text-xs cursor-pointer shadow-xs transition-transform hover:-translate-y-0.5"
               >
-                <Plus className="w-4 h-4" /> Yeni Görev Ekle
+                <Plus className="w-4 h-4" /> {t('Add New Task', 'Yeni Görev Ekle', 'Dodaj nowe zadanie')}
               </button>
             </div>
 
             {/* Tasks Kanban Columns */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 font-sans">
               
               {/* YAPILACAKLAR COLUMN */}
               <div className="bg-slate-50/40 p-4 rounded-2xl border border-slate-100/60 flex flex-col min-h-[400px]">
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-slate-400" />
-                    YAPILACAKLAR
+                    {t('TO DO', 'YAPILACAKLAR', 'DO ZROBIENIA')}
                   </h4>
                   <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-500">
                     {tasksByStatus.todo.length}
@@ -536,7 +541,7 @@ export default function ProjectsView({
                 <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
                   {tasksByStatus.todo.length === 0 ? (
                     <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                      Kayıtlı görev yok.
+                      {t('No registered tasks.', 'Kayıtlı görev yok.', 'Brak zarejestrowanych zadań.')}
                     </div>
                   ) : (
                     tasksByStatus.todo.map((t) => (
@@ -548,7 +553,7 @@ export default function ProjectsView({
                         onShiftStatus={(t) => handleStatusShift(t, 'doing')}
                         badgeClass={getPriorityBadgeClass}
                         priorityLabel={getPriorityLabel}
-                        nextStatusLabel="Çalışmayı Başlat"
+                        nextStatusLabel={t('Start Work', 'Çalışmayı Başlat', 'Rozpocznij pracę')}
                         lang={activeSettings.lang}
                         settings={activeSettings}
                       />
@@ -562,7 +567,7 @@ export default function ProjectsView({
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-bold text-blue-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                    YAPILIYOR
+                    {t('IN PROGRESS', 'YAPILIYOR', 'W TOKU')}
                   </h4>
                   <span className="bg-blue-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-blue-700">
                     {tasksByStatus.doing.length}
@@ -572,7 +577,7 @@ export default function ProjectsView({
                 <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
                   {tasksByStatus.doing.length === 0 ? (
                     <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                      Çalışılan görev yok.
+                      {t('No tasks in progress.', 'Çalışılan görev yok.', 'Brak zadań w toku.')}
                     </div>
                   ) : (
                     tasksByStatus.doing.map((t) => (
@@ -584,7 +589,7 @@ export default function ProjectsView({
                         onShiftStatus={(t) => handleStatusShift(t, 'done')}
                         badgeClass={getPriorityBadgeClass}
                         priorityLabel={getPriorityLabel}
-                        nextStatusLabel="Tamamlandı Olarak İşaretle"
+                        nextStatusLabel={t('Mark as Completed', 'Tamamlandı Olarak İşaretle', 'Oznacz jako ukończone')}
                         lang={activeSettings.lang}
                         settings={activeSettings}
                       />
@@ -598,7 +603,7 @@ export default function ProjectsView({
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-bold text-emerald-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    BİTENLER
+                    {t('COMPLETED', 'BİTENLER', 'UKOŃCZONE')}
                   </h4>
                   <span className="bg-emerald-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-emerald-700">
                     {tasksByStatus.done.length}
@@ -608,7 +613,7 @@ export default function ProjectsView({
                 <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
                   {tasksByStatus.done.length === 0 ? (
                     <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                      Tamamlanan görev yok.
+                      {t('No completed tasks.', 'Tamamlanan görev yok.', 'Brak ukończonych zadań.')}
                     </div>
                   ) : (
                     tasksByStatus.done.map((t) => (
@@ -632,17 +637,17 @@ export default function ProjectsView({
             </div>
           </div>
         ) : (
-          <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-250 text-center text-slate-400 space-y-4">
+          <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-250 text-center text-slate-400 space-y-4 font-sans">
             <Briefcase className="w-12 h-12 stroke-[1.5] mx-auto text-slate-300" />
-            <h3 className="font-semibold text-slate-755 text-base">Henüz Herhangi Bir Proje Yok</h3>
+            <h3 className="font-semibold text-slate-755 text-base">{t('No Projects Logged Yet', 'Henüz Herhangi Bir Proje Yok', 'Brak zarejestrowanych projektów')}</h3>
             <p className="text-xs max-w-sm mx-auto">
-              Tadilat işlerinizi başlatmak ve son teslim tarihlerini takip edebilmek için sol üstteki &quot;Ekle&quot; butonuna dokunun.
+              {t('Click the "Add" button on the top left to start planning and tracking your renovation milestones.', 'Tadilat işlerinizi başlatmak ve son teslim tarihlerini takip edebilmek için sol üstteki "Ekle" butonuna dokunun.', 'Kliknij przycisk „Dodaj” w lewym górnym rogu, aby rozpocząć planowanie i śledzenie etapów remontu.')}
             </p>
             <button 
               onClick={handleOpenAddProject} 
               className="px-4 py-2 bg-amber-500 hover:bg-amber-600 transition-colors text-slate-950 font-semibold text-sm rounded-xl cursor-pointer shadow-xs"
             >
-              Hemen İlk Projeyi Ekle
+              {t('Add First Project Now', 'Hemen İlk Projeyi Ekle', 'Dodaj swój pierwszy projekt')}
             </button>
           </div>
         )}
@@ -653,10 +658,10 @@ export default function ProjectsView({
         {isProjectModalOpen && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
             <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-md w-full p-6 space-y-4 relative"
+               initial={{ scale: 0.95, opacity: 0 }}
+               animate={{ scale: 1, opacity: 1 }}
+               exit={{ scale: 0.95, opacity: 0 }}
+               className="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-md w-full p-6 space-y-4 relative font-sans"
             >
               <button 
                 onClick={() => setIsProjectModalOpen(false)}
@@ -667,32 +672,34 @@ export default function ProjectsView({
 
               <div className="space-y-1">
                 <h3 className="text-lg font-bold text-slate-850">
-                  {editingProject ? 'Projeyi Düzenle' : 'Yeni Tadilat Projesi Başlat'}
+                  {editingProject ? t('Edit Project', 'Projeyi Düzenle', 'Edytuj projekt') : t('Start New Renovation Project', 'Yeni Tadilat Projesi Başlat', 'Rozpocznij nowy projekt remontu')}
                 </h3>
-                <p className="text-xs text-slate-400">Tadilat detaylarını ve bütçe planını girin</p>
+                <p className="text-xs text-slate-400">
+                  {t('Enter renovation details and budget plan', 'Tadilat detaylarını ve bütçe planını girin', 'Wprowadź szczegóły remontu i plan budżetu')}
+                </p>
               </div>
 
               <form onSubmit={handleSaveProject} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 uppercase">Proje Adı</label>
+                  <label className="text-xs font-bold text-slate-600 uppercase">{t('Project Name', 'Proje Adı', 'Nazwa projektu')}</label>
                   <input 
                     type="text" 
                     required
                     id="proj-modal-input-name"
                     value={projName}
                     onChange={(e) => setProjName(e.target.value)}
-                    placeholder="Mutfak Yenileme, Banyo Seramik vb."
+                    placeholder={t('Kitchen Renovation, Bathroom Tiles etc.', 'Mutfak Yenileme, Banyo Seramik vb.', 'Remont kuchni, płytki łazienkowe itp.')}
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 transition-all bg-slate-50/30"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 uppercase">Proje Açıklaması</label>
+                  <label className="text-xs font-bold text-slate-600 uppercase">{t('Project Description', 'Proje Açıklaması', 'Opis projektu')}</label>
                   <textarea 
                     value={projDesc}
                     id="proj-modal-input-desc"
                     onChange={(e) => setProjDesc(e.target.value)}
-                    placeholder="Mutfakta yapılacak işlemlerin özeti..."
+                    placeholder={t('Summary of operations to be done...', 'Yapılacak işlemlerin özeti...', 'Podsumowanie kroków remontowych...')}
                     rows={3}
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 transition-all bg-slate-50/30 resize-none"
                   />
@@ -701,7 +708,7 @@ export default function ProjectsView({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">
-                      {isEn ? `Allocated Budget (${activeSettings.currency})` : `Ayrılan Bütçe (${activeSettings.currency === 'TRY' ? '₺' : activeSettings.currency})`}
+                      {t('Allocated Budget', 'Ayrılan Bütçe', 'Przydzielony budżet')} ({activeSettings.currency === 'TRY' ? '₺' : activeSettings.currency})
                     </label>
                     <input 
                       type="number" 
@@ -714,17 +721,17 @@ export default function ProjectsView({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">{isEn ? 'Status' : 'Durum'}</label>
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">{t('Status', 'Durum', 'Status')}</label>
                     <select
                       id="proj-modal-input-status"
                       value={projStatus}
                       onChange={(e) => setProjStatus(e.target.value as ProjectStatus)}
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 block bg-slate-50/30 transition-all cursor-pointer font-sans text-slate-800 dark:text-white"
                     >
-                      <option value="planning">{isEn ? 'Planning' : 'Planlama'}</option>
-                      <option value="ongoing">{isEn ? 'Ongoing' : 'Devam Ediyor'}</option>
-                      <option value="suspended">{isEn ? 'Suspended' : 'Askıya Alındı'}</option>
-                      <option value="completed">{isEn ? 'Completed' : 'Tamamlandı'}</option>
+                      <option value="planning">{t('Planning', 'Planlama', 'Planowanie')}</option>
+                      <option value="ongoing">{t('Ongoing', 'Devam Ediyor', 'W toku')}</option>
+                      <option value="suspended">{t('Suspended', 'Askıya Alındı', 'Wstrzymane')}</option>
+                      <option value="completed">{t('Completed', 'Tamamlandı', 'Zakończone')}</option>
                     </select>
                   </div>
                 </div>
@@ -732,7 +739,7 @@ export default function ProjectsView({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">
-                      {isEn ? 'Start Date' : 'Başlangıç Tarihi'}
+                      {t('Start Date', 'Başlangıç Tarihi', 'Data rozpoczęcia')}
                     </label>
                     <input 
                       type="date" 
@@ -745,7 +752,7 @@ export default function ProjectsView({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">
-                      {isEn ? 'Target Date (Delivery)' : 'Bitiş Hedefi (Teslim)'}
+                      {t('Target Date (Delivery)', 'Bitiş Hedefi (Teslim)', 'Docelowa data (oddanie)')}
                     </label>
                     <input 
                       type="date" 
@@ -764,14 +771,14 @@ export default function ProjectsView({
                     onClick={() => setIsProjectModalOpen(false)}
                     className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                   >
-                    Vazgeç
+                    {t('Cancel', 'Vazgeç', 'Anuluj')}
                   </button>
                   <button 
                     type="submit" 
                     id="proj-modal-submit-btn"
                     className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-950 bg-amber-500 hover:bg-amber-600 shadow-md transition-colors cursor-pointer"
                   >
-                    {editingProject ? 'Güncelle' : 'Kaydet'}
+                    {editingProject ? t('Update', 'Güncelle', 'Aktualizuj') : t('Save', 'Kaydet', 'Zapisz')}
                   </button>
                 </div>
               </form>
@@ -788,7 +795,7 @@ export default function ProjectsView({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-md w-full p-6 space-y-4 relative"
+              className="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-md w-full p-6 space-y-4 relative font-sans"
             >
               <button 
                 onClick={() => setIsTaskModalOpen(false)}
@@ -798,33 +805,35 @@ export default function ProjectsView({
               </button>
 
               <div className="space-y-1">
-                <h3 className="text-lg font-bold text-slate-850">
-                  {editingTask ? 'Görevi Düzenle' : 'Yeni Görev Tanımla'}
+                <h3 className="text-lg font-bold text-slate-855">
+                  {editingTask ? t('Edit Task', 'Görevi Düzenle', 'Edytuj zadanie') : t('Define New Task', 'Yeni Görev Tanımla', 'Zdefiniuj nowe zadanie')}
                 </h3>
-                <p className="text-xs text-slate-400">Tadilat elemanına atanacak iş adımlarını oluşturun</p>
+                <p className="text-xs text-slate-400">
+                  {t('Create tasks to be assigned to the renovation worker', 'Tadilat elemanına atanacak iş adımlarını oluşturun', 'Utwórz kroki robocze dla wykonawcy remontu')}
+                </p>
               </div>
 
-              <form onSubmit={handleSaveTask} className="space-y-4">
+              <form onSubmit={handleSaveTask} className="space-y-4 font-sans">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 uppercase">Görev Başlığı</label>
+                  <label className="text-xs font-bold text-slate-600 uppercase">{t('Task Title', 'Görev Başlığı', 'Nazwa zadania')}</label>
                   <input 
                     type="text" 
                     required
                     id="task-modal-input-title"
                     value={taskTitle}
                     onChange={(e) => setTaskTitle(e.target.value)}
-                    placeholder="Eğrileri şaküle al, Asma tavanı karkasla vb."
+                    placeholder={t('Level the walls, Frame the suspended ceiling etc.', 'Örn: Eğrileri şaküle al, Asma tavanı karkasla vb.', 'Np: Wypoziomuj ściany, Zamontuj stelaż sufitu itp.')}
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 transition-all bg-slate-50/30"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 uppercase">İş Detayı / Açıklama</label>
+                  <label className="text-xs font-bold text-slate-600 uppercase">{t('Task Details / Description', 'İş Detayı / Açıklama', 'Szczegóły zadania / Opis')}</label>
                   <textarea 
                     value={taskDesc}
                     id="task-modal-input-desc"
                     onChange={(e) => setTaskDesc(e.target.value)}
-                    placeholder="Görevin ayrıntılı açıklaması, kullanılacak malzemeler..."
+                    placeholder={t('Detailed task description, materials to be used...', 'Görevin ayrıntılı açıklaması, kullanılacak malzemeler...', 'Szczegółowy opis zadania, materiały do użycia...')}
                     rows={2}
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 transition-all bg-slate-50/30 resize-none"
                   />
@@ -832,37 +841,37 @@ export default function ProjectsView({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Öncelik Derecesi</label>
+                    <label className="text-xs font-bold text-slate-600 uppercase">{t('Priority Level', 'Öncelik Derecesi', 'Poziom priorytetu')}</label>
                     <select
                       id="task-modal-input-priority"
                       value={taskPriority}
                       onChange={(e) => setTaskPriority(e.target.value as TaskPriority)}
-                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 block bg-slate-50/30 transition-all cursor-pointer"
+                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 block bg-slate-50/30 transition-all cursor-pointer text-slate-800 dark:text-white"
                     >
-                      <option value="low">Düşük</option>
-                      <option value="medium">Orta</option>
-                      <option value="high">Yüksek</option>
-                      <option value="urgent">Çok Acil</option>
+                      <option value="low">{t('Low', 'Düşük', 'Niski')}</option>
+                      <option value="medium">{t('Medium', 'Orta', 'Średni')}</option>
+                      <option value="high">{t('High', 'Yüksek', 'Wysoki')}</option>
+                      <option value="urgent">{t('Urgent', 'Çok Acil', 'Pilne')}</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Durum</label>
+                    <label className="text-xs font-bold text-slate-600 uppercase">{t('Status', 'Durum', 'Status')}</label>
                     <select
                       id="task-modal-input-status"
                       value={taskStatus}
                       onChange={(e) => setTaskStatus(e.target.value as TaskStatus)}
-                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 block bg-slate-50/30 transition-all cursor-pointer"
+                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/25 block bg-slate-50/30 transition-all cursor-pointer text-slate-800 dark:text-white"
                     >
-                      <option value="todo">Yapılacaklar</option>
-                      <option value="doing">Yapılıyor</option>
-                      <option value="done">Bitti</option>
+                      <option value="todo">{t('To Do', 'Yapılacaklar', 'Do zrobienia')}</option>
+                      <option value="doing">{t('Doing', 'Yapılıyor', 'W toku')}</option>
+                      <option value="done">{t('Done', 'Bitti', 'Ukończono')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Son Tarih</label>
+                    <label className="text-xs font-bold text-slate-600 uppercase">{t('Due Date', 'Son Tarih', 'Termin realizacji')}</label>
                     <input 
                       type="date" 
                       required
@@ -873,20 +882,20 @@ export default function ProjectsView({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Sorumlu Kişi / Usta</label>
+                    <label className="text-xs font-bold text-slate-600 uppercase">{t('Assigned Person / Artisan', 'Sorumlu Kişi / Usta', 'Osoba odpowiedzialna / Fachowiec')}</label>
                     <input 
                       type="text" 
                       id="task-modal-input-assignee"
                       value={taskUsta}
                       onChange={(e) => setTaskUsta(e.target.value)}
-                      placeholder="Örn: Salih Usta (Seramik)"
+                      placeholder={t('e.g. Master Salih (Tiles)', 'Örn: Salih Usta (Seramik)', 'Np. Fachowiec Jan (Płytki)')}
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30"
                     />
                   </div>
                 </div>
 
                 {!editingTask && (
-                  <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-3">
+                  <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-3 font-sans">
                     <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-300 tracking-wide select-none">
                       <input 
                         type="checkbox"
@@ -894,7 +903,7 @@ export default function ProjectsView({
                         onChange={(e) => setLinkFinance(e.target.checked)}
                         className="rounded border-slate-300 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer"
                       />
-                      <span>Görevli finansal işlem (Gelir/Gider) ekle</span>
+                      <span>{t('Link financial transaction (Income/Expense)', 'Görevle ilişkili bütçe hareketi (Gelir/Gider) ekle', 'Dodaj powiązaną transakcję finansową (Przychód/Koszt)')}</span>
                     </label>
 
                     {linkFinance && (
@@ -905,19 +914,21 @@ export default function ProjectsView({
                       >
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase">İşlem Tipi</label>
+                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase">{t('Transaction Type', 'İşlem Tipi', 'Typ transakcji')}</label>
                             <select
                               value={financeType}
                               onChange={(e) => setFinanceType(e.target.value as any)}
-                              className="w-full text-xs px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:border-amber-500 cursor-pointer text-slate-800 dark:text-slate-200"
+                              className="w-full text-xs px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:border-amber-500 cursor-pointer text-slate-800 dark:text-slate-200 font-sans"
                             >
-                              <option value="expense">Harcama / Gider (Masraf)</option>
-                              <option value="income">Gelir (Hakediş / Ödeme)</option>
+                              <option value="expense">{t('Expense / Spent (Outgo)', 'Harcama / Gider (Masraf)', 'Wydatek (Koszt)')}</option>
+                              <option value="income">{t('Income (Milestone / Payment)', 'Gelir (Hakediş / Ödeme)', 'Przychód (Etap / Płatność)')}</option>
                             </select>
                           </div>
 
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase">İşlem Tutarı ({activeSettings.currency})</label>
+                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase">
+                              {t('Transaction Amount', 'İşlem Tutarı', 'Kwota transakcji')} ({activeSettings.currency})
+                            </label>
                             <input 
                               type="number"
                               required={linkFinance}
@@ -932,49 +943,49 @@ export default function ProjectsView({
 
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase">İşlem Kategorisi</label>
+                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase">{t('Transaction Category', 'İşlem Kategorisi', 'Kategoria transakcji')}</label>
                             {financeType === 'income' ? (
                               <select
                                 value={financeCategory}
                                 onChange={(e) => setFinanceCategory(e.target.value)}
-                                className="w-full text-xs px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:border-amber-500 cursor-pointer text-slate-800 dark:text-slate-200"
+                                className="w-full text-xs px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:border-amber-500 cursor-pointer text-slate-800 dark:text-slate-200 font-sans"
                               >
-                                <option value="Bütçe Aktarımı">Bütçe Aktarımı</option>
-                                <option value="Banka Kredisi">Banka Kredisi</option>
-                                <option value="Ortak Sermaye">Ortak Sermaye</option>
-                                <option value="Yedek Akçe">Yedek Akçe</option>
-                                <option value="Müşteri Hak Edişi">Müşteri Hak Edişi</option>
-                                <option value="Diğer">Diğer</option>
+                                <option value="Bütçe Aktarımı">{t('Budget Transfer', 'Bütçe Aktarımı', 'Transfer budżetu')}</option>
+                                <option value="Banka Kredisi">{t('Bank Loan', 'Banka Kredisi', 'Kredyt bankowy')}</option>
+                                <option value="Ortak Sermaye">{t('Partner Capital', 'Ortak Sermaye', 'Kapitał partnerski')}</option>
+                                <option value="Yedek Akçe">{t('Emergency Fund', 'Yedek Akçe', 'Fundusz awaryjny')}</option>
+                                <option value="Müşteri Hak Edişi">{t('Customer Milestone', 'Müşteri Hak Edişi', 'Milestone klienta')}</option>
+                                <option value="Diğer">{t('Other', 'Diğer', 'Inne')}</option>
                               </select>
                             ) : (
                               <select
                                 value={financeCategory}
                                 onChange={(e) => setFinanceCategory(e.target.value)}
-                                className="w-full text-xs px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:border-amber-500 cursor-pointer text-slate-800 dark:text-slate-200"
+                                className="w-full text-xs px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:border-amber-500 cursor-pointer text-slate-800 dark:text-slate-200 font-sans"
                               >
-                                <option value="Kaba İnşaat Malzemesi">Kaba İnşaat Malzemesi</option>
-                                <option value="Tesisat & Altyapı">Tesisat & Altyapı</option>
-                                <option value="Usta İşçilik & Hizmet">Usta İşçilik & Hizmet</option>
-                                <option value="Taşıma & Nakliye & Moloz">Taşıma & Nakliye & Moloz</option>
-                                <option value="Aydınlatma & Aksesuar">Aydınlatma & Aksesuar</option>
-                                <option value="Mobilya & Dolap Kapakları">Mobilya & Dolap Kapakları</option>
-                                <option value="Ruhsat & Belediye & Harç">Ruhsat & Belediye & Harç</option>
-                                <option value="Diğer Giderler">Diğer Giderler</option>
+                                <option value="Kaba İnşaat Malzemesi">{t('Rough Construction Material', 'Kaba İnşaat Malzemesi', 'Materiały budowlane')}</option>
+                                <option value="Tesisat & Altyapı">{t('Plumbing & Infrastructure', 'Tesisat & Altyapı', 'Instalacje i hydraulika')}</option>
+                                <option value="Usta İşçilik & Hizmet">{t('Artisan Craftsmanship & Service', 'Usta İşçilik & Hizmet', 'Robocizna i usługi fachowców')}</option>
+                                <option value="Taşıma & Nakliye & Moloz">{t('Transport & Delivery & Rubble', 'Taşıma & Nakliye & Moloz', 'Transport i wywóz gruzu')}</option>
+                                <option value="Aydınlatma & Aksesuar">{t('Lighting & Accessories', 'Aydınlatma & Aksesuar', 'Oświetlenie i akcesoria')}</option>
+                                <option value="Mobilya & Dolap Kapakları">{t('Furniture & Cabinet Doors', 'Mobilya & Dolap Kapakları', 'Meble i fronty szafek')}</option>
+                                <option value="Ruhsat & Belediye & Harç">{t('Permit & Municipal Fees', 'Ruhsat & Belediye & Harç', 'Pozwolenia i opłaty urzędowe')}</option>
+                                <option value="Diğer Giderler">{t('Other Expenses', 'Diğer Giderler', 'Inne wydatki')}</option>
                               </select>
                             )}
                           </div>
 
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase">Ödeme Kanalı</label>
+                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-400 uppercase">{t('Payment Method', 'Ödeme Kanalı', 'Metoda płatności')}</label>
                             <select
                               value={financePaymentMethod}
                               onChange={(e) => setFinancePaymentMethod(e.target.value as any)}
-                              className="w-full text-xs px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:border-amber-500 cursor-pointer text-slate-800 dark:text-slate-200"
+                              className="w-full text-xs px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:border-amber-500 cursor-pointer text-slate-800 dark:text-slate-200 font-sans"
                             >
-                              <option value="cash">Elden / Nakit</option>
-                              <option value="card">Kredi Kartı</option>
-                              <option value="bank_transfer">Banka Havalesi / EFT</option>
-                              <option value="debt">Açık Hesap / Veresiye</option>
+                              <option value="cash">{t('Cash', 'Elden / Nakit', 'Gotówka')}</option>
+                              <option value="card">{t('Credit Card', 'Kredi Kartı', 'Karta kredytowa')}</option>
+                              <option value="bank_transfer">{t('Bank Transfer / EFT', 'Banka Havalesi / EFT', 'Przelew bankowy')}</option>
+                              <option value="debt">{t('Open Account / Debt', 'Açık Hesap / Veresiye', 'Konto otwarte / Na kredyt')}</option>
                             </select>
                           </div>
                         </div>
@@ -983,20 +994,20 @@ export default function ProjectsView({
                   </div>
                 )}
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3 pt-2 font-sans text-xs">
                   <button 
                     type="button" 
                     onClick={() => setIsTaskModalOpen(false)}
-                    className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+                    className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                   >
-                    Vazgeç
+                    {t('Cancel', 'Vazgeç', 'Anuluj')}
                   </button>
                   <button 
                     type="submit" 
                     id="task-modal-submit-btn"
-                    className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-slate-900 hover:bg-slate-850 shadow-md transition-colors cursor-pointer"
+                    className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-white bg-slate-900 hover:bg-slate-850 shadow-md transition-colors cursor-pointer"
                   >
-                    {editingTask ? 'Güncelle' : 'Kaydet'}
+                    {editingTask ? t('Update', 'Güncelle', 'Aktualizuj') : t('Save', 'Kaydet', 'Zapisz')}
                   </button>
                 </div>
               </form>
@@ -1008,7 +1019,7 @@ export default function ProjectsView({
       {/* DELETE CONFIRMATION MODAL */}
       <AnimatePresence>
         {deleteConfirmInfo?.isOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 font-sans">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -1021,12 +1032,12 @@ export default function ProjectsView({
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-base font-bold text-slate-900">
-                    {deleteConfirmInfo.type === 'project' ? 'Projeyi Sil' : 'Görevi Sil'}
+                    {deleteConfirmInfo.type === 'project' ? t('Delete Project', 'Projeyi Sil', 'Usuń projekt') : t('Delete Task', 'Görevi Sil', 'Usuń zadanie')}
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
                     {deleteConfirmInfo.type === 'project' 
-                      ? `"${deleteConfirmInfo.title}" projesini silmek istediğinize emin misiniz? Projeye bağlı tüm görevler silinecektir. Bu işlem geri alınamaz.`
-                      : `"${deleteConfirmInfo.title}" görevini kaldırmak istediğinize emin misiniz? Bu işlem geri alınamaz.`
+                      ? t('Are you sure you want to delete the project "{title}"? All tasks linked to this project will be deleted. This action cannot be undone.', '"{title}" projesini silmek istediğinize emin misiniz? Projeye bağlı tüm görevler silinecektir. Bu işlem geri alınamaz.', 'Czy na pewno chcesz usunąć projekt "{title}"? Wszystkie powiązane zadania zostaną usunięte. Tej operacji nie można cofnąć.').replace('{title}', deleteConfirmInfo.title)
+                      : t('Are you sure you want to remove the task "{title}"? This action cannot be undone.', '"{title}" görevini kaldırmak istediğinize emin misiniz? Bu işlem geri alınamaz.', 'Czy na pewno chcesz usunąć zadanie "{title}"? Tej operacji nie można cofnąć.').replace('{title}', deleteConfirmInfo.title)
                     }
                   </p>
                 </div>
@@ -1038,7 +1049,7 @@ export default function ProjectsView({
                   onClick={() => setDeleteConfirmInfo(null)}
                   className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                 >
-                  Vazgeç
+                  {t('Cancel', 'Vazgeç', 'Anuluj')}
                 </button>
                 <button 
                   type="button" 
@@ -1053,7 +1064,7 @@ export default function ProjectsView({
                   }}
                   className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700 shadow-xs transition-colors cursor-pointer"
                 >
-                  Evet, Sil
+                  {t('Yes, Delete', 'Evet, Sil', 'Tak, usuń')}
                 </button>
               </div>
             </motion.div>
@@ -1076,7 +1087,7 @@ interface TaskCardProps {
   priorityLabel: (p: TaskPriority) => string;
   isCompleted?: boolean;
   nextStatusLabel?: string;
-  lang?: 'tr' | 'en';
+  lang?: 'tr' | 'en' | 'pl';
   settings?: AppSettings;
 }
 
@@ -1090,13 +1101,20 @@ function TaskCard({
   priorityLabel,
   isCompleted = false,
   nextStatusLabel,
-  lang = 'tr',
+  lang = 'en',
   settings
 }: TaskCardProps) {
+  const t = (enStr: string, trStr: string, plStr: string) => {
+    const currentLang = settings?.lang || lang;
+    if (currentLang === 'tr') return trStr;
+    if (currentLang === 'pl') return plStr;
+    return enStr;
+  };
+
   return (
     <div className={`p-4 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all space-y-3 relative group overflow-hidden ${
       isCompleted ? 'border-slate-150 bg-slate-50/40 opacity-80' : 'border-slate-100'
-    }`}>
+    } font-sans`}>
       <div className="space-y-1.5 pl-1">
         <div className="flex justify-between items-start gap-1">
           <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 ${badgeClass(task.priority)}`}>
@@ -1107,7 +1125,7 @@ function TaskCard({
               id={`task-card-edit-btn-${task.id}`}
               onClick={() => onEdit(task)}
               className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-amber-600 transition-colors cursor-pointer"
-              title="Görevi Düzenle"
+              title={t('Edit Task', 'Görevi Düzenle', 'Edytuj zadanie')}
             >
               <Edit3 className="w-3.5 h-3.5" />
             </button>
@@ -1115,7 +1133,7 @@ function TaskCard({
               id={`task-card-delete-btn-${task.id}`}
               onClick={() => onDelete(task.id)}
               className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-650 transition-colors cursor-pointer"
-              title="Görevi Sil"
+              title={t('Delete Task', 'Görevi Sil', 'Usuń zadanie')}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -1150,7 +1168,7 @@ function TaskCard({
             onClick={() => onShiftStatusBack(task)}
             className="flex-1 text-center py-1 bg-slate-100 hover:bg-slate-200 text-[10px] font-bold rounded-lg text-slate-600 cursor-pointer"
           >
-            ← Geri Al
+            ← {t('Go Back', 'Geri Al', 'Cofnij')}
           </button>
         )}
         {onShiftStatus && (
@@ -1160,7 +1178,7 @@ function TaskCard({
             className="flex-1 inline-flex items-center justify-center gap-1 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/50 text-[10px] font-extrabold rounded-lg cursor-pointer transition-colors"
             title={nextStatusLabel}
           >
-            <Check className="w-3 h-3 text-amber-700" /> {task.status === 'todo' ? 'Başlat →' : 'Tamamla ✓'}
+            <Check className="w-3 h-3 text-amber-700" /> {task.status === 'todo' ? t('Start →', 'Başlat →', 'Rozpocznij →') : t('Complete ✓', 'Tamamla ✓', 'Ukończ ✓')}
           </button>
         )}
       </div>

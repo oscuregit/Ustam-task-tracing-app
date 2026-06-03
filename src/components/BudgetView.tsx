@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Project, Material, MaterialCategory, MaterialStatus, AppSettings } from '../types';
-import { formatMoney } from '../utils';
+import { formatMoney, translateCategory } from '../utils';
 import { 
   Building2, 
   Plus, 
@@ -63,6 +63,12 @@ export default function BudgetView({
   };
 
   const isEn = activeSettings.lang === 'en';
+  const t = (en: string, tr: string, pl: string) => {
+    if (activeSettings.lang === 'tr') return tr;
+    if (activeSettings.lang === 'pl') return pl;
+    return en;
+  };
+
   // Filters
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -306,8 +312,8 @@ export default function BudgetView({
         {/* LEFT COMPONENT COLUMN: Category allocations details */}
         <div className="space-y-5">
           <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-2xs">
-            <h3 className="font-bold text-slate-850 dark:text-slate-100 text-base mb-1">{isEn ? 'Expenses by Category' : 'Kategori Bazlı Harcamalar'}</h3>
-            <p className="text-slate-450 dark:text-slate-455 text-xs mb-4">{isEn ? 'Cost structure in selected project' : 'Seçili projedeki bütçe kalemleri dağılımı'}</p>
+            <h3 className="font-bold text-slate-850 dark:text-slate-100 text-base mb-1">{t('Expenses by Category', 'Kategori Bazlı Harcamalar', 'Wydatki według kategorii')}</h3>
+            <p className="text-slate-450 dark:text-slate-455 text-xs mb-4">{t('Cost structure in selected project', 'Seçili projedeki bütçe kalemleri dağılımı', 'Struktura kosztów w wybranym projekcie')}</p>
 
             <div className="space-y-4">
               {summaryByCategory.map((cat) => {
@@ -321,9 +327,9 @@ export default function BudgetView({
                   <div key={cat.category} className="p-3 rounded-xl border border-slate-50 dark:border-slate-800/40 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors space-y-2">
                     <div className="flex justify-between items-center">
                       <span className={`text-[10px] md:text-xs font-bold px-2 py-0.5 rounded-full ${colors?.bg} ${colors?.text}`}>
-                        {cat.category}
+                        {translateCategory(cat.category, activeSettings.lang)}
                       </span>
-                      <span className="text-xs text-slate-400 font-medium">({cat.count} {isEn ? 'Product' : 'Ürün'})</span>
+                      <span className="text-xs text-slate-400 font-medium">({cat.count} {t('Products', 'Ürün', 'Produktów')})</span>
                     </div>
 
                     <div className="flex justify-between items-center text-xs pt-1">
@@ -368,7 +374,7 @@ export default function BudgetView({
                   value={searchTerm}
                   id="search-materials-input"
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Malzeme veya satıcı adı ara..."
+                  placeholder={t('Search materials or vendors...', 'Malzeme veya satıcı adı ara...', 'Szukaj materiałów lub dostawców...')}
                   className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/50"
                 />
               </div>
@@ -379,7 +385,7 @@ export default function BudgetView({
                 onClick={handleOpenAdd}
                 className="flex items-center gap-1.5 bg-amber-505 hover:bg-amber-600 bg-amber-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs cursor-pointer shadow-xs transition-transform hover:-translate-y-0.5 w-full md:w-auto justify-center"
               >
-                <Plus className="w-4 h-4" /> Yeni Malzeme Siparişi Ekle
+                <Plus className="w-4 h-4" /> {t('Add New Material Order', 'Yeni Malzeme Siparişi Ekle', 'Dodaj Nowe Zlecenie Materiałowe')}
               </button>
             </div>
 
@@ -387,14 +393,14 @@ export default function BudgetView({
             <div className="flex flex-wrap gap-2 text-xs pt-2 border-t border-slate-100">
               {/* Project Filter */}
               <div className="flex items-center gap-1.5 min-w-[120px]">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Proje:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{t('Project:', 'Proje:', 'Projekt:')}</span>
                 <select
                   value={selectedProjectId}
                   id="filter-materials-projects"
                   onChange={(e) => setSelectedProjectId(e.target.value)}
                   className="bg-slate-50 border border-slate-150 rounded-lg px-2 py-1 text-slate-700 focus:outline-none cursor-pointer max-w-[140px] truncate"
                 >
-                  <option value="all">Tüm Projeler</option>
+                  <option value="all">{t('All Projects', 'Tüm Projeler', 'Wszystkie Projekty')}</option>
                   {projects.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
@@ -403,33 +409,33 @@ export default function BudgetView({
 
               {/* Category Filter */}
               <div className="flex items-center gap-1.5 min-w-[120px]">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kategori:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('Category:', 'Kategori:', 'Kategoria:')}</span>
                 <select
                   value={selectedCategory}
                   id="filter-materials-category"
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="bg-slate-50 border border-slate-150 rounded-lg px-2 py-1 text-slate-700 focus:outline-none cursor-pointer max-w-[140px] truncate"
                 >
-                  <option value="all">Tüm Kategoriler</option>
+                  <option value="all">{t('All Categories', 'Tüm Kategoriler', 'Wszystkie Kategorie')}</option>
                   {CATEGORIES.map(c => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>{translateCategory(c, activeSettings.lang)}</option>
                   ))}
                 </select>
               </div>
 
               {/* Purchase Status Filter */}
               <div className="flex items-center gap-1.5 min-w-[120px]">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Alım Durum:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('Status:', 'Alım Durum:', 'Status:')}</span>
                 <select
                   value={selectedStatus}
                   id="filter-materials-status"
                   onChange={(e) => setSelectedStatus(e.target.value)}
                   className="bg-slate-50 border border-slate-150 rounded-lg px-2 py-1 text-slate-700 focus:outline-none cursor-pointer"
                 >
-                  <option value="all">Tümünü Göster</option>
-                  <option value="planned">Planlanan (Alınacak)</option>
-                  <option value="purchased">Alındı (Fatura Kesildi)</option>
-                  <option value="delivered">Şantiyeye Teslim Edildi</option>
+                  <option value="all">{t('Show All', 'Tümünü Göster', 'Pokaż Wszystko')}</option>
+                  <option value="planned">{t('Planned (To Purchase)', 'Planlanan (Alınacak)', 'Planowane (Do Kupienia)')}</option>
+                  <option value="purchased">{t('Purchased', 'Alındı (Fatura Kesildi)', 'Kupione')}</option>
+                  <option value="delivered">{t('Delivered to Site', 'Şantiyeye Teslim Edildi', 'Dostarczone do Şantii')}</option>
                 </select>
               </div>
             </div>
@@ -440,9 +446,9 @@ export default function BudgetView({
             {filteredMaterials.length === 0 ? (
               <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-250 text-center text-slate-400 space-y-2">
                 <ShoppingBag className="w-10 h-10 stroke-[1.5] mx-auto text-slate-300" />
-                <h4 className="font-semibold text-slate-700 text-sm">Malzeme Kalemi Bulunamadı</h4>
+                <h4 className="font-semibold text-slate-700 text-sm">{t('No Material Items Found', 'Malzeme Kalemi Bulunamadı', 'Nie Znaleziono Pozycji Materiałowych')}</h4>
                 <p className="text-xs max-w-xs mx-auto text-slate-450">
-                  Filitreleri gevşetmeyi deneyin ya da yeni bir malzeme/sipariş kaydı girmeyi ihmal etmeyin.
+                  {t('Try broadening your filters or add a new material order.', 'Filtreleri gevşetmeyi deneyin ya da yeni bir malzeme/sipariş kaydı girmeyi ihmal etmeyin.', 'Spróbuj rozluźnić filtry lub dodaj nowe zlecenie materiałowe.')}
                 </p>
               </div>
             ) : (
@@ -458,7 +464,7 @@ export default function BudgetView({
                     <div className="space-y-1.5 flex-grow pr-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-md ${colors?.bg} ${colors?.text}`}>
-                          {m.category}
+                          {translateCategory(m.category, activeSettings.lang)}
                         </span>
                         <span className="text-[10px] font-semibold text-slate-400 truncate max-w-[150px]" title={projName}>
                           {projName}
@@ -468,15 +474,15 @@ export default function BudgetView({
                       <h4 className="font-bold text-slate-800 text-sm md:text-base">{m.title}</h4>
 
                       <div className="flex flex-wrap gap-4 text-xs text-slate-500 pt-1">
-                        <span>{isEn ? 'Vendor:' : 'Satıcı:'} <strong className="text-slate-605 dark:text-slate-350">{m.vendor || (isEn ? 'Not specified' : 'Belirtilmedi')}</strong></span>
-                        <span>{isEn ? 'Qty:' : 'Miktar:'} <strong className="text-slate-650 dark:text-slate-300">{m.quantity} {m.unit}</strong></span>
-                        <span>{isEn ? 'Unit Price:' : 'Birim Fiyat:'} <strong className="text-slate-650 dark:text-slate-300 font-mono">{formatMoney(m.unitPrice, activeSettings)}</strong></span>
+                        <span>{t('Vendor:', 'Satıcı:', 'Do dostawcy:')} <strong className="text-slate-605 dark:text-slate-350">{m.vendor || t('Not specified', 'Belirtilmedi', 'Nieokreślony')}</strong></span>
+                        <span>{t('Qty:', 'Miktar:', 'Ilość:')} <strong className="text-slate-650 dark:text-slate-300">{m.quantity} {m.unit}</strong></span>
+                        <span>{t('Unit Price:', 'Birim Fiyat:', 'Cena Jedn.:')} <strong className="text-slate-650 dark:text-slate-300 font-mono">{formatMoney(m.unitPrice, activeSettings)}</strong></span>
                       </div>
                     </div>
 
                     <div className="flex flex-row md:flex-col justify-between items-end gap-3 w-full md:w-auto border-t md:border-none pt-3 md:pt-0">
                       <div className="space-y-0.5 text-left md:text-right">
-                        <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">{isEn ? 'Total Price' : 'Toplam Bedel'}</span>
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">{t('Total Cost', 'Toplam Bedel', 'Całkowity Koszt')}</span>
                         <span className="font-bold text-slate-805 dark:text-slate-205 font-mono text-base">{formatMoney(m.totalPrice, activeSettings)}</span>
                       </div>
 
@@ -489,13 +495,13 @@ export default function BudgetView({
                             onClick={() => changeMaterialStatus(m, 'purchased')}
                             className="text-[10px] bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded font-bold cursor-pointer transition-colors border border-slate-200/50 dark:border-slate-700/60"
                           >
-                            {isEn ? 'Mark Purchased' : 'Alındı İşaretle'}
+                            {t('Mark Purchased', 'Alındı İşaretle', 'Oznacz zakupione')}
                           </button>
                         ) : (
                           <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
                             m.status === 'delivered' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300'
                           }`}>
-                            {m.status === 'delivered' ? (isEn ? 'Delivered' : 'Teslim Edildi') : (isEn ? 'Purchased' : 'Alındı')}
+                            {m.status === 'delivered' ? t('Delivered', 'Teslim Edildi', 'Wydane') : t('Purchased', 'Alındı', 'Kupione')}
                           </span>
                         )}
 
@@ -509,9 +515,9 @@ export default function BudgetView({
                                 ? 'bg-emerald-50 border-emerald-300 text-emerald-800' 
                                 : 'bg-red-50 border-red-300 text-red-800 animate-pulse'
                             }`}
-                            title={m.isPaid ? "Tahsil Edildi (Gider Olarak Ödendi)" : "Borç Olarak Bekliyor! Ödendi Olarak Değiştirmek İçin Dokun"}
+                            title={m.isPaid ? t('Paid (Logged as complete expense)', 'Tahsil Edildi (Gider Olarak Ödendi)', 'Opłacone (Zaksięgowane jako pełny wydatek)') : t('Awaiting payment! Click to change to Paid', 'Borç Olarak Bekliyor! Ödendi Olarak Değiştirmek İçin Dokun', 'Oczekuje na płatność! Kliknij, aby zmienić na Opłacone')}
                           >
-                            {m.isPaid ? 'ÖDENDİ' : 'VERESİYE/BORÇ'}
+                            {m.isPaid ? t('PAID', 'ÖDENDİ', 'OPŁACONE') : t('DEBT/CREDIT', 'VERESİYE/BORÇ', 'NA KREDYT')}
                           </button>
                         )}
 

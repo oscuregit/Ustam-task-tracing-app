@@ -66,7 +66,7 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   const [settings, setSettings] = useState<AppSettings>({
-    lang: 'tr',
+    lang: 'en',
     currency: 'TRY',
     theme: 'light',
     timezone: 'Europe/Istanbul',
@@ -155,7 +155,7 @@ export default function App() {
                 'Diğer Gelirler'
               ],
               settings: {
-                lang: 'tr',
+                lang: 'en',
                 currency: 'TRY',
                 theme: 'light',
                 timezone: 'Europe/Istanbul',
@@ -534,11 +534,14 @@ export default function App() {
 
   // Loading Splash Screen
   if (authLoading) {
+    const loadingText = settings.lang === 'tr' 
+      ? 'Ustam Bulut Veritabanı Açılıyor...' 
+      : (settings.lang === 'pl' ? 'Otwieranie bazy danych chmury Ustam...' : 'Ustam Cloud Database is opening...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0b0f19] text-slate-800 dark:text-white font-sans transition-colors duration-200">
         <div className="flex flex-col items-center space-y-4">
           <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-          <div className="text-sm font-semibold tracking-tight">Ustam Bulut Veritabanı Açılıyor...</div>
+          <div className="text-sm font-semibold tracking-tight">{loadingText}</div>
         </div>
       </div>
     );
@@ -550,6 +553,12 @@ export default function App() {
   }
 
   const activeUserName = userProfile?.name || user.displayName || user.email?.split('@')[0] || 'Kullanıcı';
+
+  const t = (en: string, tr: string, pl: string) => {
+    if (settings.lang === 'tr') return tr;
+    if (settings.lang === 'pl') return pl;
+    return en;
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0b0f19] transition-colors duration-200 flex flex-col font-sans select-none antialiased">
@@ -566,11 +575,11 @@ export default function App() {
             <div>
               <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
                 Ustam <span className="text-[10px] bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2.0 py-0.5 rounded-full font-semibold">
-                  {settings.lang === 'en' ? 'Renovation Hub' : 'Tadilat Portalı'}
+                  {t('Renovation Hub', 'Tadilat Portalı', 'Centrum Remontowe')}
                 </span>
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {settings.lang === 'en' ? 'Site operations, material budget and cash accounts' : 'Şantiye yönetimi, bütçe ve nakit muhasebesi'}
+                {t('Site operations, material budget and cash accounts', 'Şantiye yönetimi, bütçe ve nakit muhasebesi', 'Operacje budowlane, budżet materiałowy i konta gotówkowe')}
               </p>
             </div>
           </div>
@@ -580,16 +589,14 @@ export default function App() {
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               <span>
-                {settings.lang === 'en' ? 'Data Source: ' : 'Veri Kaynağı: '}
+                {t('Data Source: ', 'Veri Kaynağı: ', 'Źródło danych: ')}
                 <strong className="font-semibold text-slate-700 dark:text-slate-200">
-                  {settings.lang === 'en' ? 'Cloud Firestore DB' : 'Bulut Veritabanı'}
+                  {t('Cloud Firestore DB', 'Bulut Veritabanı', 'Baza danych Firestore')}
                 </strong>
               </span>
             </div>
             
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
-
-            <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5" title={user.email || ''}>
                 <User className="w-3.5 h-3.5 text-slate-450 dark:text-slate-400 font-bold" />
                 <span className="font-bold text-slate-700 dark:text-slate-200 max-w-[120px] truncate">
@@ -599,12 +606,12 @@ export default function App() {
               
               <button
                 onClick={() => signOut(auth)}
-                title={settings.lang === 'en' ? 'Log Out' : 'Oturumu Kapat'}
+                title={t('Log Out', 'Oturumu Kapat', 'Wyloguj się')}
                 className="flex items-center gap-1.5 bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/25 text-slate-550 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 font-bold px-2.5 py-1.5 rounded-xl cursor-pointer transition-all duration-200 border border-slate-200/40 dark:border-slate-700/50"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline font-mono text-[10px] uppercase">
-                  {settings.lang === 'en' ? 'Exit' : 'Çıkış'}
+                  {t('Exit', 'Çıkış', 'Wyjście')}
                 </span>
               </button>
             </div>
@@ -619,7 +626,7 @@ export default function App() {
         {/* RESPONSIVE FLOATING SIDEBAR NAVIGATION */}
         <nav className="w-full md:w-64 flex-shrink-0 space-y-1 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-255 border-slate-200 dark:border-slate-800 shadow-xs self-start">
           <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3 mb-3">
-            {settings.lang === 'en' ? 'MANAGEMENT CONSOLE' : 'YÖNETİM PANELİ'}
+            {t('MANAGEMENT CONSOLE', 'YÖNETİM PANELİ', 'KONSOLA ZARZĄDZANIA')}
           </div>
           
           <button
@@ -695,21 +702,21 @@ export default function App() {
           {/* Quick utility section stats */}
           <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
             <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
-              {settings.lang === 'en' ? 'LIVE STATS' : 'Canlı Performans'}
+              {t('LIVE STATS', 'Canlı Performans', 'STATYSTYKI NA ŻYWO')}
             </div>
             <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
               <div className="flex justify-between">
-                <span>{settings.lang === 'en' ? 'Active Projects' : 'Aktif Projeler'}</span>
+                <span>{t('Active Projects', 'Aktif Projeler', 'Aktywne Projekty')}</span>
                 <span className="font-bold text-slate-800 dark:text-slate-200">{projects.filter(p => p.status === 'ongoing').length}</span>
               </div>
               <div className="flex justify-between">
-                <span>{settings.lang === 'en' ? 'Pending Tasks' : 'Bekleyen İşler'}</span>
+                <span>{t('Pending Tasks', 'Bekleyen İşler', 'Oczekujące Zadania')}</span>
                 <span className="font-bold text-slate-850 dark:text-slate-200">{tasks.filter(t => t.status !== 'done').length}</span>
               </div>
               <div className="flex justify-between">
-                <span>{settings.lang === 'en' ? 'Material Orders' : 'Malzeme Alımı'}</span>
+                <span>{t('Material Orders', 'Malzeme Alımı', 'Zamówienia Materiałowe')}</span>
                 <span className="font-bold text-slate-850 dark:text-slate-200">
-                  {materials.filter(m => m.status !== 'planned').length} {settings.lang === 'en' ? 'Orders' : 'Sipariş'}
+                  {materials.filter(m => m.status !== 'planned').length} {t('Orders', 'Sipariş', 'Zlecenia')}
                 </span>
               </div>
             </div>
@@ -794,11 +801,11 @@ export default function App() {
       {/* FOOTER METRICS AND META */}
       <footer className="bg-white border-t border-slate-100 py-4 px-6 text-center text-xs text-slate-400 mt-12">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-          <span>{settings.lang === 'en' ? 'Renovation Budget & Job Tracker System © 2026. All Rights Reserved.' : 'Tadilat Bütçe ve İş Takip Sistemi © 2026. Tüm Hakları Saklıdır.'}</span>
+          <span>{t('Renovation Budget & Job Tracker System © 2026. All Rights Reserved.', 'Tadilat Bütçe ve İş Takip Sistemi © 2026. Tüm Hakları Saklıdır.', 'System budżetu i śledzenia pracy remontowej © 2026. Wszelkie prawa zastrzeżone.')}</span>
           <div className="flex gap-4">
-            <span className="font-medium text-slate-500">{settings.lang === 'en' ? 'Crafted UI' : 'Milli Üretim'}</span>
+            <span className="font-medium text-slate-500">{t('Crafted UI', 'Milli Üretim', 'Dopracowany interfejs')}</span>
             <span className="text-slate-350">|</span>
-            <span className="font-semibold text-slate-500">{settings.lang === 'en' ? 'Time & Budget Efficiency' : 'Zaman ve Bütçe Tasarrufu'}</span>
+            <span className="font-semibold text-slate-500">{t('Time & Budget Efficiency', 'Zaman ve Bütçe Tasarrufu', 'Oszczędność czasu i budżetu')}</span>
           </div>
         </div>
       </footer>

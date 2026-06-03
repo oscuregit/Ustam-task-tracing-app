@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Project, Transaction, TransactionType, AppSettings } from '../types';
-import { formatMoney, formatDate } from '../utils';
+import { formatMoney, formatDate, translateCategory } from '../utils';
 import { 
   DollarSign, 
   Plus, 
@@ -46,6 +46,16 @@ const PAYMENT_METHODS = [
   { key: 'debt', label: 'Açık Hesap / Veresiye' }
 ];
 
+export function getTranslatedPaymentMethod(key: string, lang: string): string {
+  const trs: Record<string, { tr: string; en: string; pl: string }> = {
+    cash: { tr: 'Elden / Nakit', en: 'Cash / Hand-to-hand', pl: 'Gotówka / Do ręki' },
+    card: { tr: 'Kredi Kartı', en: 'Credit Card', pl: 'Karta kredytowa' },
+    bank_transfer: { tr: 'Banka Havalesi / EFT', en: 'Bank Transfer / EFT', pl: 'Przelew bankowy / EFT' },
+    debt: { tr: 'Açık Hesap / Veresiye', en: 'Open Account / Debt', pl: 'Konto otwarte / Dług' }
+  };
+  return trs[key]?.[lang] || trs[key]?.tr || key;
+}
+
 const GIDER_KATEGORILERI = [
   'Kaba İnşaat Malzemesi',
   'Tesisat & Altyapı',
@@ -81,6 +91,11 @@ export default function AccountingView({
   };
 
   const isEn = activeSettings.lang === 'en';
+  const t = (en: string, tr: string, pl: string) => {
+    if (activeSettings.lang === 'tr') return tr;
+    if (activeSettings.lang === 'pl') return pl;
+    return en;
+  };
   // Filters
   const [projectIdFilter, setProjectIdFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -427,12 +442,12 @@ export default function AccountingView({
         <div className="bg-red-50 dark:bg-rose-950/20 border border-red-200 dark:border-rose-900/40 text-red-800 dark:text-rose-300 p-4 rounded-xl flex items-start gap-3">
           <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0 text-red-600" />
           <div className="space-y-1">
-            <h4 className="font-semibold text-sm">{isEn ? 'Financial Budget Overrun Alert!' : 'Finansal Bütçe Aşımı Riski!'}</h4>
+            <h4 className="font-semibold text-sm">{t('Financial Budget Overrun Alert!', 'Finansal Bütçe Aşımı Riski!', 'Ostrzeżenie o Przekroczeniu Budżetu!')}</h4>
             <p className="text-xs text-red-705 dark:text-rose-350">
-              {isEn ? (
-                `Total expenditures on this project (${formatMoney(balances.totalExpenses, activeSettings)}) have run past the target allocation limit of ${formatMoney(balances.projectBudgetLimit, activeSettings)}. Please examine actual costs.`
-              ) : (
-                `Bu projedeki toplam harcama bedelleri (${formatMoney(balances.totalExpenses, activeSettings)}), projeye ayrılan sınır bütçeyi (${formatMoney(balances.projectBudgetLimit, activeSettings)}) aşmış durumda. Lütfen maliyetleri gözden geçirin.`
+              {t(
+                `Total expenditures on this project (${formatMoney(balances.totalExpenses, activeSettings)}) have run past the target allocation limit of ${formatMoney(balances.projectBudgetLimit, activeSettings)}. Please examine actual costs.`,
+                `Bu projedeki toplam harcama bedelleri (${formatMoney(balances.totalExpenses, activeSettings)}), projeye ayrılan sınır bütçeyi (${formatMoney(balances.projectBudgetLimit, activeSettings)}) aşmış durumda. Lütfen maliyetleri gözden geçirin.`,
+                `Całkowite wydatki na ten projekt (${formatMoney(balances.totalExpenses, activeSettings)}) przekroczyły limit alokacji projektu wynoszący ${formatMoney(balances.projectBudgetLimit, activeSettings)}. Proszę sprawdzić faktyczne koszty.`
               )}
             </p>
           </div>
@@ -444,20 +459,20 @@ export default function AccountingView({
         <div className="space-y-2 w-full md:w-auto">
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-amber-500" />
-            <h2 className="text-lg font-bold text-slate-850">Kasa &amp; Defter Muhasebe Raporu</h2>
+            <h2 className="text-lg font-bold text-slate-850">{t('Book Balance & Ledger Account Report', 'Kasa & Defter Muhasebe Raporu', 'Raport Salda Kasy i Księgi Głównej')}</h2>
           </div>
           
           {/* Select scope filter */}
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 pt-1">
-            <span>Raporlama Çerçevesi:</span>
+            <span>{t('Reporting Scope:', 'Raporlama Çerçevesi:', 'Zakres Raportowania:')}</span>
             <select
               value={projectIdFilter}
               id="accounting-filter-scope"
               onChange={(e) => setProjectIdFilter(e.target.value)}
               className="bg-slate-50 border border-slate-205 border-slate-200 rounded-lg px-2 py-1 text-slate-700 font-semibold focus:outline-none cursor-pointer max-w-[200px]"
             >
-              <option value="all">Genel Muhasebe (Tüm İşler)</option>
-              <option value="global">Sadece Bağımsız Giderler / Genel</option>
+              <option value="all">{t('General Ledger (All Projects)', 'Genel Muhasebe (Tüm İşler)', 'Księga Główna (Wszystkie Projekty)')}</option>
+              <option value="global">{t('Independent Expenses / General Only', 'Sadece Bağımsız Giderler / Genel', 'Tylko Niezależne Wydatki / Ogólne')}</option>
               {projects.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
@@ -478,17 +493,17 @@ export default function AccountingView({
             id="backup-import-btn"
             onClick={triggerImportClick}
             className="flex items-center gap-1 text-xs font-semibold px-3.5 py-2 bg-slate-100 hover:bg-slate-250 hover:bg-slate-200 text-slate-650 rounded-xl transition-colors cursor-pointer"
-            title="Dışarıdan JSON Yedek Dosyası Geri Yükle"
+            title={t('Restore JSON backup file', 'Dışarıdan JSON Yedek Dosyası Geri Yükle', 'Przywróć kopię zapasową JSON')}
           >
-            <Upload className="w-3.5 h-3.5" /> Veri Yükle
+            <Upload className="w-3.5 h-3.5" /> {t('Import Data', 'Veri Yükle', 'Importuj Dane')}
           </button>
           <button 
             id="backup-export-btn"
             onClick={handleDownloadBackup}
             className="flex items-center gap-1 text-xs font-semibold px-3.5 py-2 bg-slate-100 hover:bg-slate-250 hover:bg-slate-200 text-slate-650 rounded-xl transition-colors cursor-pointer"
-            title="Tüm Proje ve Muhasebe Verilerini Yedekle"
+            title={t('Back up all project and accounting data', 'Tüm Proje ve Muhasebe Verilerini Yedekle', 'Kopia wszystkich projektów i danych')}
           >
-            <Download className="w-3.5 h-3.5" /> Yedek Al (.JSON)
+            <Download className="w-3.5 h-3.5" /> {t('Backup (.JSON)', 'Yedek Al (.JSON)', 'Kopia zapasowa (.JSON)')}
           </button>
         </div>
       </div>
@@ -502,12 +517,12 @@ export default function AccountingView({
             <TrendingUp className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider block">{isEn ? 'Inflow / Budgeted Funds' : 'Giriş / Bütçelenen Fon'}</span>
+            <span className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider block">{t('Inflow / Budgeted Funds', 'Giriş / Bütçelenen Fon', 'Przychody / Budżetowane Środki')}</span>
             <h3 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-200 font-mono mt-0.5">
               {formatMoney(balances.totalInjections, activeSettings)}
             </h3>
             {projectIdFilter !== 'all' && projectIdFilter !== 'global' && (
-              <p className="text-[10px] text-slate-400">{isEn ? 'Project Allocation Limit: ' : 'Proje Sınır Hedefi: '}{formatMoney(balances.projectBudgetLimit, activeSettings)}</p>
+              <p className="text-[10px] text-slate-400">{t('Project Allocation Limit: ', 'Proje Sınır Hedefi: ', 'Limit Alokacji Projektu: ')}{formatMoney(balances.projectBudgetLimit, activeSettings)}</p>
             )}
           </div>
         </div>
@@ -518,13 +533,13 @@ export default function AccountingView({
             <TrendingDown className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider block font-semibold">{isEn ? 'Total Outflow / Expenses' : 'Toplam Çıkış / Giderler'}</span>
+            <span className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider block font-semibold">{t('Total Outflow / Expenses', 'Toplam Çıkış / Giderler', 'Całkowity Odpływ / Wydatki')}</span>
             <h3 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-200 font-mono mt-0.5">
               {formatMoney(balances.totalExpenses, activeSettings)}
             </h3>
             {balances.projectBudgetLimit > 0 && (
               <p className="text-[10px] text-slate-400">
-                {isEn ? 'Quota Spent Ratio: ' : 'Limit Doluluk Oranı: '}%{Math.round((balances.totalExpenses / balances.projectBudgetLimit) * 105 / 105 * 100)}
+                {t('Quota Spent Ratio: ', 'Limit Doluluk Oranı: ', 'Stopień zużycia limitu: ')}%{Math.round((balances.totalExpenses / balances.projectBudgetLimit) * 105 / 105 * 100)}
               </p>
             )}
           </div>
@@ -536,11 +551,11 @@ export default function AccountingView({
             <DollarSign className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider block font-semibold">{isEn ? 'Book Balance (Remaining)' : 'Kasa Dengesi (Kalan Nakit)'}</span>
+            <span className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider block font-semibold">{t('Book Balance (Remaining)', 'Kasa Dengesi (Kalan Nakit)', 'Saldo Księgowe (Pozostałe)')}</span>
             <h3 className={`text-xl md:text-2xl font-bold font-mono mt-0.5 ${balances.netBalance >= 0 ? 'text-amber-600' : 'text-rose-600'}`}>
               {formatMoney(balances.netBalance, activeSettings)}
             </h3>
-            <p className="text-[10px] text-slate-400">{isEn ? 'Net remaining cash pool' : 'Sermaye eksi harcanan net kasa'}</p>
+            <p className="text-[10px] text-slate-400">{t('Net remaining cash pool', 'Sermaye eksi harcanan net kasa', 'Kapitał minus faktyczne wydatki')}</p>
           </div>
         </div>
       </div>
@@ -553,14 +568,14 @@ export default function AccountingView({
           <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-850 pb-3">
             <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-2">
               <Settings className="w-4 h-4 text-amber-500" />
-              Gelir &amp; Gider Başlıklarını Düzenle
+              {t('Edit Income & Expense Categories', 'Gelir & Gider Başlıklarını Düzenle', 'Edytuj Kategorie Przychodów i Wydatków')}
             </h4>
             <button 
               type="button" 
               onClick={() => setShowCategoryPanel(!showCategoryPanel)}
               className="text-xs text-slate-500 hover:text-amber-500 font-semibold flex items-center gap-1 cursor-pointer"
             >
-              {showCategoryPanel ? 'Kapat' : 'Göster & Düzenle'}
+              {showCategoryPanel ? t('Close', 'Kapat', 'Zamknij') : t('Show & Edit', 'Göster & Düzenle', 'Pokaż i Edytuj')}
             </button>
           </div>
 
@@ -571,11 +586,17 @@ export default function AccountingView({
               className="space-y-4"
             >
               <div className="bg-slate-50/50 dark:bg-slate-950 p-3 rounded-xl border border-slate-150 dark:border-slate-800 space-y-3">
-                <p className="text-[11px] text-slate-500 leading-relaxed font-medium">Bu sayfadan yeni fatura, hakediş veya masraf kalemi başlığı tanımlayabilirsiniz.</p>
+                <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                  {t(
+                    'Here you can define new invoice, progress payment, or expense categories.',
+                    'Bu sayfadan yeni fatura, hakediş veya masraf kalemi başlığı tanımlayabilirsiniz.',
+                    'Tutaj możesz zdefiniować nowe kategorie faktur, płatności etapowych lub wydatków.'
+                  )}
+                </p>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input 
                     type="text" 
-                    placeholder="Başlık adı (Örn: Çimento Faturası)"
+                    placeholder={t('Category name (e.g. Cement Invoice)', 'Başlık adı (Örn: Çimento Faturası)', 'Nazwa kategorii (np. Faktura za cement)')}
                     value={newCatName}
                     onChange={(e) => setNewCatName(e.target.value)}
                     className="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 focus:outline-none focus:border-amber-500 text-slate-800 dark:text-slate-200"
@@ -585,22 +606,24 @@ export default function AccountingView({
                     onChange={(e) => setNewCatType(e.target.value as any)}
                     className="text-xs px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 cursor-pointer text-slate-800 dark:text-slate-200"
                   >
-                    <option value="expense">Gider Kalemi</option>
-                    <option value="income">Gelir Kalemi</option>
+                    <option value="expense">{t('Expense Category', 'Gider Kalemi', 'Pozycja wydatków')}</option>
+                    <option value="income">{t('Income Category', 'Gelir Kalemi', 'Pozycja przychodów')}</option>
                   </select>
                   <button 
                     type="button"
                     onClick={handleAddCategory}
                     className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-4 py-2 rounded-lg cursor-pointer transition-colors"
                   >
-                    Ekle
+                    {t('Add', 'Ekle', 'Dodaj')}
                   </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div className="space-y-2">
-                  <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px] block">Gider Başlıkları ({expenseCategories.length})</span>
+                  <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px] block">
+                    {t('Expense Categories', 'Gider Başlıkları', 'Kategorie wydatków')} ({expenseCategories.length})
+                  </span>
                   <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
                     {expenseCategories.map(cat => (
                       <div key={cat} className="flex justify-between items-center p-2 rounded-lg bg-red-50/40 dark:bg-rose-950/20 border border-red-100/50 dark:border-rose-900/10">
@@ -608,7 +631,7 @@ export default function AccountingView({
                         <button 
                           onClick={() => handleDeleteCategory(cat, 'expense')}
                           className="text-[10px] font-bold text-red-500 hover:text-red-700 cursor-pointer p-0.5"
-                          title="Sil"
+                          title={t('Delete', 'Sil', 'Usuń')}
                         >
                           ✕
                         </button>
@@ -618,7 +641,9 @@ export default function AccountingView({
                 </div>
 
                 <div className="space-y-2">
-                  <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px] block">Gelir Başlıkları ({incomeCategories.length})</span>
+                  <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px] block">
+                    {t('Income Categories', 'Gelir Başlıkları', 'Kategorie przychodów')} ({incomeCategories.length})
+                  </span>
                   <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
                     {incomeCategories.map(cat => (
                       <div key={cat} className="flex justify-between items-center p-2 rounded-lg bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/10">
@@ -626,7 +651,7 @@ export default function AccountingView({
                         <button 
                           onClick={() => handleDeleteCategory(cat, 'income')}
                           className="text-[10px] font-bold text-red-500 hover:text-red-700 cursor-pointer p-0.5"
-                          title="Sil"
+                          title={t('Delete', 'Sil', 'Usuń')}
                         >
                           ✕
                         </button>
@@ -639,7 +664,13 @@ export default function AccountingView({
           )}
 
           {!showCategoryPanel && (
-            <p className="text-xs text-slate-500 leading-relaxed italic">Buradan muhasebe defterinde kullanılan finansal kategorileri özgürce ekleyebilir, silebilir ve özel kalemler üretebilirsiniz.</p>
+            <p className="text-xs text-slate-500 leading-relaxed italic">
+              {t(
+                'Here you can freely add, delete, and customize financial categories used in the ledger.',
+                'Buradan muhasebe defterinde kullanılan finansal kategorileri özgürce ekleyebilir, silebilir ve kendinize göre özelleştirebilirsiniz.',
+                'Tutaj możesz swobodnie dodawać, usuwać i dostosowywać kategorie finansowe używane w księdze.'
+              )}
+            </p>
           )}
         </div>
 
@@ -648,14 +679,14 @@ export default function AccountingView({
           <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-850 pb-3">
             <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-2">
               <Calendar className="w-4 h-4 text-emerald-500" />
-              Aylık Sabit Gelir &amp; Gider Şablonları
+              {t('Monthly Recurring Income & Expense Templates', 'Aylık Sabit Gelir & Gider Şablonları', 'Szablony Miesięcznych Przychodów i Wydatków')}
             </h4>
             <button 
               type="button" 
               onClick={() => setShowRecurringPanel(!showRecurringPanel)}
               className="text-xs text-slate-500 hover:text-emerald-500 font-semibold flex items-center gap-1 cursor-pointer"
             >
-              {showRecurringPanel ? 'Kapat' : 'Yönet & Deftere İşle'}
+              {showRecurringPanel ? t('Close', 'Kapat', 'Zamknij') : t('Manage & Roll to Ledger', 'Yönet & Deftere İşle', 'Zarządzaj i Zapisz')}
             </button>
           </div>
 
@@ -666,11 +697,11 @@ export default function AccountingView({
               className="space-y-4"
             >
               <div className="bg-slate-50/50 dark:bg-slate-950 p-3 rounded-xl border border-slate-150 dark:border-slate-800 space-y-3 text-xs">
-                <span className="font-bold text-[10px] block text-slate-500 uppercase">Yeni Düzenli Ödeme / Gelir Şablonu</span>
+                <span className="font-bold text-[10px] block text-slate-500 uppercase">{t('New Recurring Payment / Income Template', 'Yeni Düzenli Ödeme / Gelir Şablonu', 'Nowy Szablon Płatności Recurring / Przychodów')}</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input 
                     type="text" 
-                    placeholder="Gider / Abone Adı (Örn: Ofis Kirası)"
+                    placeholder={t('Expense / Title (e.g. Office Rent)', 'Gider / Abone Adı (Örn: Ofis Kirası)', 'Nazwa wydatku / tytuł (np. Czynsz za biuro)')}
                     value={recTitle}
                     onChange={(e) => setRecTitle(e.target.value)}
                     className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-850 focus:outline-none dark:bg-slate-900 text-slate-800 dark:text-slate-200"
@@ -678,7 +709,7 @@ export default function AccountingView({
                   <div className="flex gap-1.5">
                     <input 
                       type="number" 
-                      placeholder="Tutar"
+                      placeholder={t('Amount', 'Tutar', 'Kwota')}
                       value={recAmount}
                       onChange={(e) => setRecAmount(e.target.value)}
                       className="w-1/2 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-850 focus:outline-none font-mono dark:bg-slate-900 text-slate-800 dark:text-slate-200"
@@ -691,28 +722,28 @@ export default function AccountingView({
                       }}
                       className="w-1/2 text-xs px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 cursor-pointer text-slate-800 dark:text-slate-200"
                     >
-                      <option value="expense">Gider (-)</option>
-                      <option value="income">Gelir (+)</option>
+                      <option value="expense">{t('Expense (-)', 'Gider (-)', 'Wydatek (-)')}</option>
+                      <option value="income">{t('Income (+)', 'Gelir (+)', 'Przychód (+)')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase">Vade Günü</label>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase">{t('Due Day', 'Vade Günü', 'Dzień Płatności')}</label>
                     <select 
                       value={recDay}
                       onChange={(e) => setRecDay(Number(e.target.value))}
                       className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 cursor-pointer text-slate-800 dark:text-slate-200"
                     >
                       {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                        <option key={d} value={d}>Ayın {d}. Günü</option>
+                        <option key={d} value={d}>{t(`Day ${d} of Month`, `Ayın ${d}. Günü`, `${d}. dzień miesiąca`)}</option>
                       ))}
                     </select>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase">Kategori</label>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase">{t('Category', 'Kategori', 'Kategoria')}</label>
                     <select 
                       value={recCategory}
                       onChange={(e) => setRecCategory(e.target.value)}
@@ -727,16 +758,16 @@ export default function AccountingView({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase">Kanal</label>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase">{t('Payment Method', 'Kanal', 'Metoda płatności')}</label>
                     <select 
                       value={recPayMethod}
                       onChange={(e) => setRecPayMethod(e.target.value)}
                       className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 cursor-pointer text-slate-800 dark:text-slate-200"
                     >
-                      <option value="bank_transfer">Banka Havalesi</option>
-                      <option value="card">Kredi Kartı</option>
-                      <option value="cash">Nakit / Elden</option>
-                      <option value="debt">Açık Hesap</option>
+                      <option value="bank_transfer">{t('Bank Transfer', 'Banka Havalesi', 'Przelew bankowy')}</option>
+                      <option value="card">{t('Credit Card', 'Kredi Kartı', 'Karta kredytowa')}</option>
+                      <option value="cash">{t('Cash', 'Nakit / Elden', 'Gotówka')}</option>
+                      <option value="debt">{t('Open Account / Debt', 'Açık Hesap', 'Dług / Rachunek otwarty')}</option>
                     </select>
                   </div>
                 </div>
@@ -746,13 +777,13 @@ export default function AccountingView({
                   onClick={handleAddRecurring}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 rounded-lg cursor-pointer transition-colors"
                 >
-                  Sabit Şablon Kaydet
+                  {t('Save Recurring Template', 'Sabit Şablon Kaydet', 'Zapisz Szablon Recurring')}
                 </button>
               </div>
 
               <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                 {recurringTransactions.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-4 italic">Tanımlı sabit gelir-gider şablonu bulunmamaktadır.</p>
+                  <p className="text-xs text-slate-400 text-center py-4 italic">{t('No recurring templates configured yet.', 'Tanımlı sabit gelir-gider şablonu bulunmamaktadır.', 'Brak skonfigurowanych szablonów recurring.')}</p>
                 ) : (
                   recurringTransactions.map(item => (
                     <div key={item.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/20 text-xs gap-3">
@@ -760,10 +791,10 @@ export default function AccountingView({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className={`w-2 h-2 rounded-full ${item.type === 'income' ? 'bg-emerald-500' : 'bg-red-500'}`} />
                           <h5 className="font-bold text-slate-800 dark:text-slate-200">{item.title}</h5>
-                          <span className="text-[10px] text-slate-400 font-semibold">({item.category})</span>
+                          <span className="text-[10px] text-slate-400 font-semibold font-sans">({translateCategory(item.category, activeSettings.lang)})</span>
                         </div>
                         <p className="text-[10px] text-slate-550 pt-0.5">
-                          Tutar: <span className="font-mono font-bold text-slate-700 dark:text-slate-350">{formatMoney(item.amount, activeSettings)}</span> • Her Ayın {item.dayOfMonth}. Günü
+                          {t('Amount: ', 'Tutar: ', 'Kwota: ')}<span className="font-mono font-bold text-slate-700 dark:text-slate-350">{formatMoney(item.amount, activeSettings)}</span> • {t(`Day ${item.dayOfMonth} of every Month`, `Her Ayın ${item.dayOfMonth}. Günü`, `${item.dayOfMonth}. dzień każdego miesiąca`)}
                         </p>
                       </div>
 
@@ -771,16 +802,16 @@ export default function AccountingView({
                         <button 
                           onClick={() => handleLaunchRecurringTransaction(item)}
                           className="bg-slate-900 dark:bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-white font-bold px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer flex items-center gap-0.5"
-                          title="Cari muhasebe defterine bir kayıt işle"
+                          title={t('Post a transaction line to the current ledger', 'Cari muhasebe defterine bir kayıt işle', 'Zapisz transakcję w bieżącej księdze')}
                         >
-                          <Plus className="w-3 h-3" /> Deftere İşle
+                          <Plus className="w-3 h-3" /> {t('Post to Ledger', 'Deftere İşle', 'Zapisz w Księdze')}
                         </button>
                         <button 
                           onClick={() => handleDeleteRecurring(item.id)}
                           className="p-1 px-2 border border-slate-200 dark:border-slate-800 hover:bg-red-50 text-red-500 rounded-lg text-[10px] cursor-pointer"
-                          title="Şablonu Kaldır"
+                          title={t('Remove Template', 'Şablonu Kaldır', 'Usuń szablon')}
                         >
-                          Sil
+                          {t('Delete', 'Sil', 'Usuń')}
                         </button>
                       </div>
                     </div>
@@ -791,7 +822,13 @@ export default function AccountingView({
           )}
 
           {!showRecurringPanel && (
-            <p className="text-xs text-slate-500 leading-relaxed italic">Abonelikler, faturalar veya düzenli kontrat kazançları gibi sabit sirkülasyonları şablon olarak kurup, tek tıkla cari işlem tablonuza işleyebilirsiniz.</p>
+            <p className="text-xs text-slate-500 leading-relaxed italic">
+              {t(
+                'Set up fixed recursive transactions like subscriptions, utility bills or regular contract incomes as templates and log them with a single click.',
+                'Abonelikler, faturalar veya düzenli kontrat kazançları gibi sabit sirkülasyonları şablon olarak kurup, tek tıkla cari işlem tablonuza işleyebilirsiniz.',
+                'Skonfiguruj stałe transakcje, takie jak subskrypcje, rachunki lub regularne przychody z kontraktów, jako szablony i wprowadzaj je jednym kliknięciem.'
+              )}
+            </p>
           )}
         </div>
       </div>
@@ -801,8 +838,8 @@ export default function AccountingView({
         
         {/* Ledger Header with fast action buttons */}
         <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-            <FileText className="w-5 h-5 text-slate-500" /> Finansal Defter Kayıtları
+          <h3 className="font-bold text-slate-800 text-base flex items-center gap-2 font-sans">
+            <FileText className="w-5 h-5 text-slate-500" /> {t('Financial Ledger Transactions', 'Finansal Defter Kayıtları', 'Ewidencja Transakcji Finansowych')}
           </h3>
           
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -811,14 +848,14 @@ export default function AccountingView({
               onClick={() => handleOpenAdd('income')}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-800 border border-emerald-200 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors"
             >
-              <Plus className="w-3.5 h-3.5" /> Bütçe Ekle
+              <Plus className="w-3.5 h-3.5" /> {t('Add Budget / Income', 'Bütçe Ekle', 'Dodaj Przychód')}
             </button>
             <button 
               id="acc-add-expense-btn"
               onClick={() => handleOpenAdd('expense')}
               className="flex-1 sm:flex-initial flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-800 border border-red-200 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors"
             >
-              <Plus className="w-3.5 h-3.5" /> Gider Ekle
+              <Plus className="w-3.5 h-3.5" /> {t('Add Expense', 'Gider Ekle', 'Dodaj Wydatek')}
             </button>
           </div>
         </div>
@@ -827,31 +864,31 @@ export default function AccountingView({
         <div className="bg-slate-50/50 p-4 border-b border-slate-105 border-slate-100 flex flex-wrap gap-4 text-xs">
           {/* Record Type Filter */}
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">İşlem Tipi:</span>
+            <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">{t('Transaction Type:', 'İşlem Tipi:', 'Typ Transakcji:')}</span>
             <select
               value={typeFilter}
               id="accounting-filter-type"
               onChange={(e) => setTypeFilter(e.target.value)}
               className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-650 cursor-pointer"
             >
-              <option value="all">Sermaye &amp; Gider Tümü</option>
-              <option value="income">Sadece Fon Bütçe Girişi (Gelir)</option>
-              <option value="expense">Sadece Harcama / Maliyet (Gider)</option>
+              <option value="all">{t('All Inflow & Outflow', 'Sermaye & Gider Tümü', 'Wszystkie Przychody i Wydatki')}</option>
+              <option value="income">{t('Inflow / Funding Only', 'Sadece Fon Bütçe Girişi (Gelir)', 'Tylko Przychody / Finansowanie')}</option>
+              <option value="expense">{t('Outflow / Cost Only', 'Sadece Harcama / Maliyet (Gider)', 'Tylko Wydatki / Koszty')}</option>
             </select>
           </div>
 
           {/* Ledger Category lists */}
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Kategori:</span>
+            <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">{t('Category:', 'Kategori:', 'Kategoria:')}</span>
             <select
               value={categoryFilter}
               id="accounting-filter-category"
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-650 cursor-pointer"
             >
-              <option value="all">Tüm Kategoriler</option>
+              <option value="all">{t('All Categories', 'Tüm Kategoriler', 'Wszystkie Kategorie')}</option>
               {Array.from(new Set([...incomeCategories, ...expenseCategories])).map(c => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>{translateCategory(c, activeSettings.lang)}</option>
               ))}
             </select>
           </div>
@@ -862,96 +899,86 @@ export default function AccountingView({
           {filteredTransactions.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs italic space-y-2">
               <DollarSign className="w-10 h-10 stroke-[1.5] mx-auto text-slate-300" />
-              <p>Eşleşen herhangi bir muhasebe işlemi bulunamadı.</p>
+              <p>{t('No matching transactions found.', 'Eşleşen herhangi bir muhasebe işlemi bulunamadı.', 'Nie znaleziono pasujących transakcji.')}</p>
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  <th className="py-3 px-4">Tarih</th>
-                  <th className="py-3 px-4">Proje</th>
-                  <th className="py-3 px-4">Açıklama / Başlık</th>
-                  <th className="py-3 px-4">Kategori</th>
-                  <th className="py-3 px-4">Ödeme Yöntemi</th>
-                  <th className="py-3 px-4 text-right">Tutar</th>
-                  <th className="py-3 px-4 text-center">İşlem</th>
+                  <th className="py-3 px-4">{t('Date', 'Tarih', 'Data')}</th>
+                  <th className="py-3 px-4">{t('Project', 'Proje', 'Projekt')}</th>
+                  <th className="py-3 px-4">{t('Description / Title', 'Açıklama / Başlık', 'Opis / Tytuł')}</th>
+                  <th className="py-3 px-4">{t('Category', 'Kategori', 'Kategoria')}</th>
+                  <th className="py-3 px-4">{t('Payment Method', 'Ödeme Yöntemi', 'Metoda płatności')}</th>
+                  <th className="py-3 px-4 text-right">{t('Amount', 'Tutar', 'Kwota')}</th>
+                  <th className="py-3 px-4 text-center">{t('Action', 'İşlem', 'Operacja')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {filteredTransactions.map((t) => {
-                  const correlatedProj = projects.find(p => p.id === t.projectId)?.name || 
-                    (t.projectId === 'global' ? (isEn ? 'General Overhead / Independent' : 'Genel Gider / Bağımsız') : (isEn ? 'Unknown Project' : 'Bilinmeyen Proje'));
+                {filteredTransactions.map((tItem) => {
+                  const correlatedProj = projects.find(p => p.id === tItem.projectId)?.name || 
+                    (tItem.projectId === 'global' ? t('General Overhead / Independent', 'Genel Gider / Bağımsız', 'Ogólne koszty stałe / Niezależne') : t('Unknown Project', 'Bilinmeyen Proje', 'Nieznany projekt'));
 
                   // Helper for payment method labels
                   const getPaymentMethodLabel = (methodKey: string) => {
-                    if (isEn) {
-                      switch(methodKey) {
-                        case 'cash': return 'Cash';
-                        case 'card': return 'Credit/Debit Card';
-                        case 'bank_transfer': return 'Bank Wire / EFT';
-                        case 'debt': return 'Deferred / On Credit';
-                        default: return methodKey;
-                      }
-                    } else {
-                      switch(methodKey) {
-                        case 'cash': return 'Elden / Nakit';
-                        case 'card': return 'Kredi Kartı';
-                        case 'bank_transfer': return 'Banka Havalesi / EFT';
-                        case 'debt': return 'Açık Hesap / Veresiye';
-                        default: return methodKey;
-                      }
+                    switch(methodKey) {
+                      case 'cash': return t('Cash', 'Elden / Nakit', 'Gotówka');
+                      case 'card': return t('Credit/Debit Card', 'Kredi Kartı', 'Karta kredytowa/debetowa');
+                      case 'bank_transfer': return t('Bank Wire / EFT', 'Banka Havalesi / EFT', 'Przelew bankowy / EFT');
+                      case 'debt': return t('Open Account / Debt', 'Açık Hesap / Veresiye', 'Dług / Rachunek otwarty');
+                      default: return methodKey;
                     }
                   };
 
                   return (
-                    <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                    <tr key={tItem.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
                       <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap font-mono">
-                        {formatDate(t.date, activeSettings)}
+                        {formatDate(tItem.date, activeSettings)}
                       </td>
                       <td className="py-3.5 px-4 font-semibold text-slate-600 dark:text-slate-350 max-w-[150px] truncate" title={correlatedProj}>
                         {correlatedProj}
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="space-y-0.5">
-                          <span className="font-bold text-slate-800 dark:text-slate-200 block md:text-sm">{t.title}</span>
-                          {t.notes && <span className="text-slate-400 dark:text-slate-500 block text-[10px] italic">{t.notes}</span>}
+                          <span className="font-bold text-slate-800 dark:text-slate-200 block md:text-sm">{tItem.title}</span>
+                          {tItem.notes && <span className="text-slate-400 dark:text-slate-500 block text-[10px] italic">{tItem.notes}</span>}
                         </div>
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap text-slate-550 dark:text-slate-400">
-                        {t.category}
+                        {translateCategory(tItem.category, activeSettings.lang)}
                       </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 dark:text-slate-350 font-medium">
-                        {getPaymentMethodLabel(t.paymentMethod)}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 dark:text-slate-350 font-medium font-sans">
+                        {getTranslatedPaymentMethod(tItem.paymentMethod, activeSettings.lang)}
                       </td>
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <span className={`font-bold font-mono text-sm inline-flex items-center gap-0.5 ${
-                          t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-650 text-red-600'
+                          tItem.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-650 text-red-600'
                         }`}>
-                          {t.type === 'income' ? '+' : '-'} {formatMoney(t.amount, activeSettings)}
-                          {t.type === 'income' ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+                          {tItem.type === 'income' ? '+' : '-'} {formatMoney(tItem.amount, activeSettings)}
+                          {tItem.type === 'income' ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5">
                           <button 
-                            id={`acc-ledger-edit-btn-${t.id}`}
-                            onClick={() => handleOpenEdit(t)}
+                            id={`acc-ledger-edit-btn-${tItem.id}`}
+                            onClick={() => handleOpenEdit(tItem)}
                             className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-amber-600 transition-colors cursor-pointer"
-                            title="İşlemi Düzenle"
+                            title={t('Edit Transaction', 'İşlemi Düzenle', 'Edytuj Transakcję')}
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button 
-                            id={`acc-ledger-delete-btn-${t.id}`}
+                            id={`acc-ledger-delete-btn-${tItem.id}`}
                             onClick={() => {
                               setDeleteConfirmInfo({
                                 isOpen: true,
-                                id: t.id,
-                                title: t.title
+                                id: tItem.id,
+                                title: tItem.title
                               });
                             }}
                             className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-                            title="İşlemi Sil"
+                            title={t('Delete Transaction', 'İşlemi Sil', 'Usuń Transakcję')}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -983,18 +1010,24 @@ export default function AccountingView({
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="space-y-1">
+              <div className="space-y-1 font-sans">
                 <h3 className="text-lg font-bold text-slate-850">
-                  {editingTransaction ? 'İşlemi Düzenle' : (formType === 'income' ? 'Bütçe Girişi Yap' : 'Yeni Gider Girişi')}
+                  {editingTransaction ? t('Edit Transaction', 'İşlemi Düzenle', 'Edytuj transakcję') : (formType === 'income' ? t('Add Financial Budget', 'Bütçe Girişi Yap', 'Dodaj wpis budżetowy') : t('New Expense Entry', 'Yeni Gider Girişi', 'Nowy wpis wydatków'))}
                 </h3>
-                <p className="text-xs text-slate-400">Kasaya nakit katkısı veya şantiye masrafları hakediş girdileri</p>
+                <p className="text-xs text-slate-400">
+                  {t(
+                    'Locker cash contributions or site expenses progress billing values',
+                    'Kasaya nakit katkısı veya şantiye masrafları hakediş girdileri',
+                    'Wpłaty gotówkowe do kasy lub wpisy rozliczeniowe kosztów budowy'
+                  )}
+                </p>
               </div>
 
               <form onSubmit={handleSave} className="space-y-4">
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">İlgili Proje Kapsamı</label>
+                  <div className="space-y-1.5 font-sans">
+                    <label className="text-xs font-bold text-slate-600 uppercase">{t('Associated Project Scope', 'İlgili Proje Kapsamı', 'Powiązany zakres projektuScope')}</label>
                     <select
                       id="acc-modal-input-proj"
                       required
@@ -1002,15 +1035,15 @@ export default function AccountingView({
                       onChange={(e) => setFormProjId(e.target.value)}
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 tracking-wide block bg-slate-50/50 cursor-pointer"
                     >
-                      <option value="global">Eşlenmemiş / Genel</option>
+                      <option value="global">{t('Unassigned / General', 'Eşlenmemiş / Genel', 'Nieprzypisane / Ogólne')}</option>
                       {projects.map((p) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Ödeme Türü / Tip</label>
+                  <div className="space-y-1.5 font-sans">
+                    <label className="text-xs font-bold text-slate-600 uppercase">{t('Transaction Type / Kind', 'Ödeme Türü / Tip', 'Typ płatności / transakcji')}</label>
                     <select
                       id="acc-modal-input-type"
                       required
@@ -1022,28 +1055,28 @@ export default function AccountingView({
                       }}
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 tracking-wide block bg-slate-50/50 cursor-pointer"
                     >
-                      <option value="expense">Nakit Çıkışı / Gider</option>
-                      <option value="income">Sermaye / Bütçe Aktarımı</option>
+                      <option value="expense">{t('Cash Outflow / Expense', 'Nakit Çıkışı / Gider', 'Rozchód gotówkowy / Wydatek')}</option>
+                      <option value="income">{t('Capital / Budget Injection', 'Sermaye / Bütçe Aktarımı', 'Suma kapitału / Wpłata')}</option>
                     </select>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 uppercase">Ödeme/Gider Başlığı</label>
+                <div className="space-y-1.5 font-sans">
+                  <label className="text-xs font-bold text-slate-600 uppercase">{t('Payment/Expense Title', 'Ödeme/Gider Başlığı', 'Tytuł płatności/wydatku')}</label>
                   <input 
                     type="text" 
                     required
                     id="acc-modal-input-title"
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder={formType === 'income' ? 'Kişisel tasarruf birikimi aktarımı' : 'Salih Usta seramik kırma hakedişi'}
-                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30"
+                    placeholder={formType === 'income' ? t('Capital savings injection fund', 'Kişisel tasarruf birikimi aktarımı', 'Przelew dodatkowych środków kapitałowych') : t('Drywall work contractor payroll', 'Salih Usta seramik kırma hakedişi', 'Wynagrodzenie za prace glazurnicze / ekipa')}
+                    className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30 font-sans"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Kategori</label>
+                  <div className="space-y-1.5 font-sans">
+                    <label className="text-xs font-bold text-slate-600 uppercase">{t('Category', 'Kategori', 'Kategoria')}</label>
                     {formType === 'income' ? (
                       <select
                         id="acc-modal-input-cat-income"
@@ -1052,7 +1085,7 @@ export default function AccountingView({
                         className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 tracking-wide block bg-slate-50/50 cursor-pointer"
                       >
                         {incomeCategories.map(c => (
-                          <option key={c} value={c}>{c}</option>
+                          <option key={c} value={c}>{translateCategory(c, activeSettings.lang)}</option>
                         ))}
                       </select>
                     ) : (
@@ -1063,14 +1096,14 @@ export default function AccountingView({
                         className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 tracking-wide block bg-slate-50/50 cursor-pointer"
                       >
                         {expenseCategories.map(c => (
-                          <option key={c} value={c}>{c}</option>
+                          <option key={c} value={c}>{translateCategory(c, activeSettings.lang)}</option>
                         ))}
                       </select>
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">Ödeme Kanalı</label>
+                  <div className="space-y-1.5 font-sans">
+                    <label className="text-xs font-bold text-slate-600 uppercase">{t('Payment Method', 'Ödeme Kanalı', 'Metoda płatności')}</label>
                     <select
                       id="acc-modal-input-paymethod"
                       value={formPayMethod}
@@ -1078,16 +1111,16 @@ export default function AccountingView({
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 tracking-wide block bg-slate-50/50 cursor-pointer"
                     >
                       {PAYMENT_METHODS.map((p) => (
-                        <option key={p.key} value={p.key}>{p.label}</option>
+                        <option key={p.key} value={p.key}>{getTranslatedPaymentMethod(p.key, activeSettings.lang)}</option>
                       ))}
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 font-sans">
                     <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">
-                      {isEn ? `Amount (${activeSettings.currency})` : `Tutar (${activeSettings.currency === 'TRY' ? '₺' : activeSettings.currency})`}
+                      {t(`Amount (${activeSettings.currency})`, `Tutar (${activeSettings.currency === 'TRY' ? '₺' : activeSettings.currency})`, `Kwota (${activeSettings.currency})`)}
                     </label>
                     <input 
                       type="number" 
@@ -1099,8 +1132,8 @@ export default function AccountingView({
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-mono bg-slate-50/30"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase">İşlem Tarihi</label>
+                  <div className="space-y-1.5 font-sans">
+                    <label className="text-xs font-bold text-slate-600 uppercase">{t('Transaction Date', 'İşlem Tarihi', 'Data transakcji')}</label>
                     <input 
                       type="date" 
                       required
@@ -1112,32 +1145,32 @@ export default function AccountingView({
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 uppercase">Not / Detaylar</label>
+                <div className="space-y-1.5 font-sans font-medium">
+                  <label className="text-xs font-bold text-slate-600 uppercase">{t('Notes / Details', 'Not / Detaylar', 'Uwagi / Szczegóły')}</label>
                   <input 
                     type="text" 
                     id="acc-modal-input-notes"
                     value={formNotes}
                     onChange={(e) => setFormNotes(e.target.value)}
-                    placeholder="Fatura No, usta telefon veya teslimat notu..."
+                    placeholder={t('Invoice No, phone or delivery notes...', 'Fatura No, usta telefon veya teslimat notu...', 'Nr faktury, telefon kontaktowy lub uwagi do dostawy...')}
                     className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 transition-all bg-slate-50/30"
                   />
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3 pt-2 font-sans font-semibold">
                   <button 
                     type="button" 
                     onClick={() => setIsModalOpen(false)}
                     className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                   >
-                    Vazgeç
+                    {t('Cancel', 'Vazgeç', 'Anuluj')}
                   </button>
                   <button 
                     type="submit" 
                     id="acc-modal-submit-btn"
                     className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-slate-900 hover:bg-slate-850 shadow-md transition-colors cursor-pointer"
                   >
-                    {editingTransaction ? 'Güncelle' : 'Kaydet'}
+                    {editingTransaction ? t('Update', 'Güncelle', 'Aktualizuj') : t('Save', 'Kaydet', 'Zapisz')}
                   </button>
                 </div>
               </form>
@@ -1154,16 +1187,20 @@ export default function AccountingView({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full p-6 space-y-5 relative"
+              className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full p-6 space-y-5 relative font-sans"
             >
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-red-50 text-red-650 rounded-xl flex-shrink-0">
+                <div className="p-2 bg-red-50 text-red-650 rounded-xl flex-shrink-0 font-sans">
                   <AlertTriangle className="w-5 h-5 text-red-600" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-base font-bold text-slate-900 font-sans">Kaydı Sil</h3>
+                <div className="space-y-1 font-sans">
+                  <h3 className="text-base font-bold text-slate-900 font-sans">{t('Delete Transaction', 'Kaydı Sil', 'Usuń wpis')}</h3>
                   <p className="text-xs text-slate-500 leading-relaxed font-sans">
-                    "{deleteConfirmInfo.title}" adlı muhasebe kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+                    {t(
+                      `Are you sure you want to delete the ledger entry "${deleteConfirmInfo.title}"? This action cannot be undone.`,
+                      `"${deleteConfirmInfo.title}" adlı muhasebe kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`,
+                      `Czy na pewno chcesz usunąć wpis księgowy "${deleteConfirmInfo.title}"? Ta operacja jest nieodwracalna.`
+                    )}
                   </p>
                 </div>
               </div>
@@ -1174,7 +1211,7 @@ export default function AccountingView({
                   onClick={() => setDeleteConfirmInfo(null)}
                   className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                 >
-                  Vazgeç
+                  {t('Cancel', 'Vazgeç', 'Anuluj')}
                 </button>
                 <button 
                   type="button" 
@@ -1185,7 +1222,7 @@ export default function AccountingView({
                   }}
                   className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700 shadow-xs transition-colors cursor-pointer"
                 >
-                  Evet, Sil
+                  {t('Yes, Delete', 'Evet, Sil', 'Tak, usuń')}
                 </button>
               </div>
             </motion.div>

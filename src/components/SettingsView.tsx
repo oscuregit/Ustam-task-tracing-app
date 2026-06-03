@@ -66,73 +66,75 @@ export default function SettingsView({
   const [profileRole, setProfileRole] = useState(currentUser?.role || '');
 
   const t = (key: string) => {
-    const isEn = settings.lang === 'en';
-    const dict: Record<string, { tr: string; en: string }> = {
-      title: { tr: 'Uygulama Ayarları', en: 'Application Settings' },
-      subtitle: { tr: 'Sistem dilini, para birimini, bütçe uyarılarını ve veri yedeklerini buradan kontrol edin.', en: 'Control system language, currency, budget warnings, and data backups here.' },
+    const lang = settings.lang || 'en';
+    const dict: Record<string, { tr: string; en: string; pl: string }> = {
+      title: { tr: 'Uygulama Ayarları', en: 'Application Settings', pl: 'Ustawienia Aplikacji' },
+      subtitle: { tr: 'Sistem dilini, para birimini, bütçe uyarılarını ve veri yedeklerini buradan kontrol edin.', en: 'Control system language, currency, budget warnings, and data backups here.', pl: 'Kontroluj język systemu, walutę, ostrzeżenia o budżecie i kopie zapasowe danych.' },
       
       // Sections
-      general: { tr: 'Genel Tanımlamalar', en: 'General Configurations' },
-      appearance: { tr: 'Görünüm ve Arayüz', en: 'Appearance & UI' },
-      financial: { tr: 'Mali & Bütçe Kuralları', en: 'Financial & Budget Rules' },
-      dataManagement: { tr: 'Veri ve Güvenlik Yönetimi', en: 'Data & Security Management' },
+      general: { tr: 'Genel Tanımlamalar', en: 'General Configurations', pl: 'Ogólne Konfiguracje' },
+      appearance: { tr: 'Görünüm ve Arayüz', en: 'Appearance & UI', pl: 'Wygląd i Interfejs' },
+      financial: { tr: 'Mali & Bütçe Kuralları', en: 'Financial & Budget Rules', pl: 'Zasady Finansowe i Budżetowe' },
+      dataManagement: { tr: 'Veri ve Güvenlik Yönetimi', en: 'Data & Security Management', pl: 'Zarządzanie Danymi i Bezpieczeństwem' },
       
       // Fields
-      langLabel: { tr: 'Sistem Dili', en: 'System Language' },
-      langDesc: { tr: 'Tüm menüler, tablolar ve raporlarda kullanılacak dil.', en: 'Language used in menus, tables, and reports.' },
-      currencyLabel: { tr: 'Varsayılan Para Birimi', en: 'Default Currency' },
-      currencyDesc: { tr: 'Tüm bütçe, bakiye ve mali hesaplamalarda kullanılan simge.', en: 'Symbol used in budgets, balances, and reports.' },
-      timezoneLabel: { tr: 'Zaman Dilimi', en: 'Timezone' },
-      timezoneDesc: { tr: 'Görev teslim tarihleri ve işlem saat dilimi ayarı.', en: 'Used for task deadlines and ledger logs timezone.' },
+      langLabel: { tr: 'Sistem Dili', en: 'System Language', pl: 'Język Systemu' },
+      langDesc: { tr: 'Tüm menüler, tablolar ve raporlarda kullanılacak dil.', en: 'Language used in menus, tables, and reports.', pl: 'Język używany w menu, tabelach i raportach.' },
+      currencyLabel: { tr: 'Varsayılan Para Birimi', en: 'Default Currency', pl: 'Domyślna Waluta' },
+      currencyDesc: { tr: 'Tüm bütçe, bakiye ve mali hesaplamalarda kullanılan simge.', en: 'Symbol used in budgets, balances, and reports.', pl: 'Symbol używany w budżetach, saldach i raportach.' },
+      timezoneLabel: { tr: 'Zaman Dilimi', en: 'Timezone', pl: 'Strefa Czasowa' },
+      timezoneDesc: { tr: 'Görev teslim tarihleri ve işlem saat dilimi ayarı.', en: 'Used for task deadlines and ledger logs timezone.', pl: 'Używane do terminów zadań i strefy czasowej księgi.' },
       
-      dateFormatLabel: { tr: 'Tarih Formatı', en: 'Date Format' },
-      dateFormatDesc: { tr: 'Uygulamadaki tüm tarih görünümlerinin biçimlendirilme standardı.', en: 'Standard formatting for all date displays in the application.' },
+      dateFormatLabel: { tr: 'Tarih Formatı', en: 'Date Format', pl: 'Format Daty' },
+      dateFormatDesc: { tr: 'Uygulamadaki tüm tarih görünümlerinin biçimlendirilme standardı.', en: 'Standard formatting for all date displays in the application.', pl: 'Standardowe formatowanie dat w całej aplikacji.' },
       
-      themeLabel: { tr: 'Görünüm Modu', en: 'Theme Mode' },
-      themeDesc: { tr: 'Görüntüleme modunu açık veya karanlık olarak ayarlayın.', en: 'Toggle application theme between light and dark.' },
-      themeLight: { tr: 'Aydınlık Şablon', en: 'Light Template' },
-      themeDark: { tr: 'Karanlık Şablon', en: 'Dark Template' },
+      themeLabel: { tr: 'Görünüm Modu', en: 'Theme Mode', pl: 'Tryb Wyglądu' },
+      themeDesc: { tr: 'Görüntüleme modunu açık veya karanlık olarak ayarlayın.', en: 'Toggle application theme between light and dark.', pl: 'Przełącz motyw aplikacji między jasnym a ciemnym.' },
+      themeLight: { tr: 'Aydınlık Şablon', en: 'Light Template', pl: 'Jasny Szablon' },
+      themeDark: { tr: 'Karanlık Şablon', en: 'Dark Template', pl: 'Ciemny Szablon' },
       
-      welcomeBanner: { tr: 'Genel Karşılama Paneli', en: 'Welcome Dashboard Header' },
-      welcomeBannerDesc: { tr: 'Genel kontrol panelinde bilgi özet başlığını göster.', en: 'Show information summary card in dashboard.' },
+      welcomeBanner: { tr: 'Genel Karşılama Paneli', en: 'Welcome Dashboard Header', pl: 'Nagłówek Pulpitu Powitalnego' },
+      welcomeBannerDesc: { tr: 'Genel kontrol panelinde bilgi özet başlığını göster.', en: 'Show information summary card in dashboard.', pl: 'Pokaż podsumowanie informacji na pulpicie nawigacyjnym.' },
       
-      vatLabel: { tr: 'Varsayılan KDV Oranı (%)', en: 'Default VAT Rate (%)' },
-      vatDesc: { tr: 'Yeni malzeme eklerken önerilen vergi oranı çarpanı.', en: 'Proposed tax rate multiplier when introducing materials.' },
-      warningThreshold: { tr: 'Bütçe Aşım Uyarı Eşiği (%)', en: 'Budget Overrun Limit (%)' },
-      warningThresholdDesc: { tr: 'Proje harcamaları bu oranı geçerse kırmızı uyarı gösterilir.', en: 'Highlight project card in crimson if budget usage percentage exceeds this.' },
-      decimals: { tr: 'Kuruş Gösterimi / Duyarlılık', en: 'Decimal Precision' },
-      decimalsDesc: { tr: 'Parasal değerlerin küsuratlı (kuruşlu) gösterilme biçimi.', en: 'Format in which financial values show decimal parts.' },
-      decimalsNo: { tr: 'Kuruşsuz (örn. 1.500 ₺)', en: 'No Decimals (e.g., 1,500 ₺)' },
-      decimalsYes: { tr: 'Kuruşlu (örn. 1.500,00 ₺)', en: 'With Decimals (e.g., 1,500.00 ₺)' },
+      vatLabel: { tr: 'Varsayılan KDV Oranı (%)', en: 'Default VAT Rate (%)', pl: 'Domyślna stawka VAT (%)' },
+      vatDesc: { tr: 'Yeni malzeme eklerken önerilen vergi oranı çarpanı.', en: 'Proposed tax rate multiplier when introducing materials.', pl: 'Proponowany mnożnik podatku przy dodawaniu materiałów.' },
+      warningThreshold: { tr: 'Bütçe Aşım Uyarı Eşiği (%)', en: 'Budget Overrun Limit (%)', pl: 'Limit Przekroczenia Budżetu (%)' },
+      warningThresholdDesc: { tr: 'Proje harcamaları bu oranı geçerse kırmızı uyarı gösterilir.', en: 'Highlight project card in crimson if budget usage percentage exceeds this.', pl: 'Wyróżnij projekt na czerwono, jeśli zużycie budżetu przekroczy tę wartość.' },
+      decimals: { tr: 'Kuruş Gösterimi / Duyarlılık', en: 'Decimal Precision', pl: 'Precyzja Dziesiętna' },
+      decimalsDesc: { tr: 'Parasal değerlerin küsuratlı (kuruşlu) gösterilme biçimi.', en: 'Format in which financial values show decimal parts.', pl: 'Format, w jakim wartości finansowe pokazują części dziesiętne.' },
+      decimalsNo: { tr: 'Kuruşsuz (örn. 1.500 ₺)', en: 'No Decimals (e.g., 1,500 ₺)', pl: 'Bez Groszy (np. 1 500 zł)' },
+      decimalsYes: { tr: 'Kuruşlu (örn. 1.500,00 ₺)', en: 'With Decimals (e.g., 1,500.00 ₺)', pl: 'Z Groszami (np. 1 500,00 zł)' },
       
-      autoSync: { tr: 'Otomatik Muhasebe Entegrasyonu', en: 'Automatic Accounting Ledger Sync' },
-      autoSyncDesc: { tr: 'Alınan malzemeler ödendi olarak işaretlendiğinde gider defterine otomatik masraf kaydı ekle.', en: 'Automatically inject transaction expense when purchased materials are paid.' },
+      autoSync: { tr: 'Otomatik Muhasebe Entegrasyonu', en: 'Automatic Accounting Ledger Sync', pl: 'Automatyczna Synchronizacja Księgi' },
+      autoSyncDesc: { tr: 'Alınan malzemeler ödendi olarak işaretlendiğinde gider defterine otomatik masraf kaydı ekle.', en: 'Automatically inject transaction expense when purchased materials are paid.', pl: 'Automatycznie dodaj wydatek, gdy zakupione materiały zostaną opłacone.' },
       
-      exportData: { tr: 'Verileri Dışarı Aktar', en: 'Export Full System Data' },
-      exportDataDesc: { tr: 'Tüm projelerinizi, görevleri ve bütçe verilerinizi JSON formatında yedekleyin.', en: 'Download all project logs, tasks, and budgets as a lightweight JSON backup.' },
-      exportBtn: { tr: 'Yedek Dosyasını İndir (JSON)', en: 'Download Backup JSON' },
-      copyJsonBtn: { tr: 'Panoya Kopyala', en: 'Copy JSON Draft' },
+      exportData: { tr: 'Verileri Dışarı Aktar', en: 'Export Full System Data', pl: 'Eksportuj Pełne Dane Systemu' },
+      exportDataDesc: { tr: 'Tüm projelerinizi, görevleri ve bütçe verilerinizi JSON formatında yedekleyin.', en: 'Download all project logs, tasks, and budgets as a lightweight JSON backup.', pl: 'Pobierz wszystkie projekty, zadania i budżety jako plik JSON.' },
+      exportBtn: { tr: 'Yedek Dosyasını İndir (JSON)', en: 'Download Backup JSON', pl: 'Pobierz Kopię Zapasową JSON' },
+      copyJsonBtn: { tr: 'Panoya Kopyala', en: 'Copy JSON Draft', pl: 'Kopiuj Szkic JSON' },
       
-      importData: { tr: 'Yedekten Geri Yükle', en: 'Restore from Backup' },
-      importDataDesc: { tr: 'Önceden indirdiğiniz bir sistem yedeğini veya JSON verisini geri yükleyin.', en: 'Load a saved system state or custom database payload.' },
-      importBtn: { tr: 'Yedek Yükle panelini Aç', en: 'Open JSON Loader Console' },
-      importSubmit: { tr: 'Yüklemeyi Doğrula ve Tamamla', en: 'Verify and Apply Database Import' },
-      importError: { tr: 'Hata! Geçersiz yedek JSON yapısı girdiniz.', en: 'Error! You entered an invalid backup JSON structure.' },
-      importSuccess: { tr: 'Tebrikler! Veriler başarıyla içe aktarıldı.', en: 'Congratulations! Database successfully loaded.' },
+      importData: { tr: 'Yedekten Geri Yükle', en: 'Restore from Backup', pl: 'Przywróć z Kopii Zapasowej' },
+      importDataDesc: { tr: 'Önceden indirdiğiniz bir sistem yedeğini veya JSON verisini geri yükleyin.', en: 'Load a saved system state or custom database payload.', pl: 'Wczytaj zapisany stan systemu lub niestandardowe dane JSON.' },
+      importBtn: { tr: 'Yedek Yükle panelini Aç', en: 'Open JSON Loader Console', pl: 'Otwórz konsolę ładowania JSON' },
+      importSubmit: { tr: 'Yüklemeyi Doğrula ve Tamamla', en: 'Verify and Apply Database Import', pl: 'Zweryfikuj i zastosuj import bazy danych' },
+      importError: { tr: 'Hata! Geçersiz yedek JSON yapısı girdiniz.', en: 'Error! You entered an invalid backup JSON structure.', pl: 'Błąd! Wprowadzono nieprawidłową strukturę JSON kopii zapasowej.' },
+      importSuccess: { tr: 'Tebrikler! Veriler başarıyla içe aktarıldı.', en: 'Congratulations! Database successfully loaded.', pl: 'Gratulacje! Baza danych została pomyślnie wczytana.' },
       
-      resetData: { tr: 'Sistem Verilerini Sıfırla (Fabrika Ayarları)', en: 'Reset All Local Accounts' },
-      resetDataDesc: { tr: 'Cihazınızdaki tüm proje, faaliyet ve harcamaları temizleyerek uygulamayı ilk veri şablonuna döndürür.', en: 'Destroys all local storage logs and returns applet database to blank skeleton.' },
-      resetBtn: { tr: 'Tüm Veriyi Sıfırla', en: 'Destroy All Local Database' },
-      resetConfirmTitle: { tr: 'Emin misiniz? Geri Dönüşü Yoktur!', en: 'Are you absolutely sure? This cannot be undone!' },
-      resetConfirmDesc: { tr: 'Bu işlem cihazda kayıtlı tüm projeleri, görevleri, malzeme kalemlerini ve muhasebe kayıtlarını kalıcı olarak siler ve ilk örnek veriyi yükler.', en: 'This will wipe out all project documents, expense entries, tasks and install standard demo logs.' },
-      resetDangerVerifyBtn: { tr: 'Sıfırlamayı Kabul Ediyorum, Her Şeyi Sil', en: 'Yes, Destroy All Data' },
+      resetData: { tr: 'Sistem Verilerini Sıfırla (Fabrika Ayarları)', en: 'Reset All Local Accounts', pl: 'Zresetuj Wszystkie Konta Lokalne' },
+      resetDataDesc: { tr: 'Cihazınızdaki tüm proje, faaliyet ve harcamaları temizleyerek uygulamayı ilk veri şablonuna döndürür.', en: 'Destroys all local storage logs and returns applet database to blank skeleton.', pl: 'Usuwa wszystkie lokalne dane i przywraca aplikację do pustego stanu.' },
+      resetBtn: { tr: 'Tüm Veriyi Sıfırla', en: 'Destroy All Local Database', pl: 'Zniszcz Wszystkie Dane' },
+      resetConfirmTitle: { tr: 'Emin misiniz? Geri Dönüşü Yoktur!', en: 'Are you absolutely sure? This cannot be undone!', pl: 'Czy jesteś absolutnie pewien? Tego nie można cofnąć!' },
+      resetConfirmDesc: { tr: 'Bu işlem cihazda kayıtlı tüm projeleri, görevleri, malzeme kalemlerini ve muhasebe kayıtlarını kalıcı olarak siler ve ilk örnek veriyi yükler.', en: 'This will wipe out all project documents, expense entries, tasks and install standard demo logs.', pl: 'To spowoduje usunięcie wszystkich projektów, wydatków, zadań i zainstalowanie standardowych danych demonstracyjnych.' },
+      resetDangerVerifyBtn: { tr: 'Sıfırlamayı Kabul Ediyorum, Her Şeyi Sil', en: 'Yes, Destroy All Data', pl: 'Tak, zniszcz wszystkie dane' },
       
-      saveSuccess: { tr: 'Ayarlarınız başarıyla kaydedildi!', en: 'System settings successfully updated!' },
-      cancel: { tr: 'Vazgeç', en: 'Cancel' },
-      active: { tr: 'Aktif', en: 'Active' },
-      inactive: { tr: 'Pasif', en: 'Inactive' },
+      saveSuccess: { tr: 'Ayarlarınız başarıyla kaydedildi!', en: 'System settings successfully updated!', pl: 'Ustawienia systemu zostały pomyślnie zaktualizowane!' },
+      cancel: { tr: 'Vazgeç', en: 'Cancel', pl: 'Anuluj' },
+      active: { tr: 'Aktif', en: 'Active', pl: 'Aktywne' },
+      inactive: { tr: 'Pasif', en: 'Inactive', pl: 'Nieaktywne' },
     };
-    return dict[key] ? (isEn ? dict[key].en : dict[key].tr) : key;
+    if (lang === 'tr') return dict[key] ? dict[key].tr : key;
+    if (lang === 'pl') return dict[key] ? dict[key].pl : key;
+    return dict[key] ? dict[key].en : key;
   };
 
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -150,7 +152,11 @@ export default function SettingsView({
 
   const handleCopyJson = () => {
     navigator.clipboard.writeText(exportDataJson);
-    setSuccessMsg(settings.lang === 'en' ? 'JSON copied to clipboard!' : 'JSON verisi panoya kopyalandi!');
+    setSuccessMsg(
+      settings.lang === 'en' 
+        ? 'JSON copied to clipboard!' 
+        : (settings.lang === 'pl' ? 'Skopiowano JSON do schowka!' : 'JSON verisi panoya kopyalandı!')
+    );
     setTimeout(() => {
       setSuccessMsg(null);
     }, 3000);
@@ -374,6 +380,16 @@ export default function SettingsView({
                   }`}
                 >
                   EN English
+                </button>
+                <button
+                  onClick={() => updateSetting('lang', 'pl')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-all ${
+                    settings.lang === 'pl' 
+                      ? 'bg-white text-blue-600 shadow-xs font-bold' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  PL Polski
                 </button>
               </div>
             </div>
