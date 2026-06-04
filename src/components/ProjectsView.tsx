@@ -103,6 +103,9 @@ export default function ProjectsView({
   
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  
+  // Track selected task board view tab: 'all' | 'todo' | 'doing' | 'done'
+  const [taskBoardTab, setTaskBoardTab] = useState<'all' | 'todo' | 'doing' | 'done'>('all');
 
   // State for adding a project
   const [projName, setProjName] = useState('');
@@ -523,116 +526,206 @@ export default function ProjectsView({
               </button>
             </div>
 
+            {/* Segmented Task Board View Selector (Tabs) */}
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-150/40 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-2xl mb-6 font-sans w-fit max-w-full">
+              <button
+                type="button"
+                onClick={() => setTaskBoardTab('all')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  taskBoardTab === 'all'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-100 dark:ring-slate-700'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
+                }`}
+              >
+                <span>{t('All Columns', 'Tüm Panolar', 'Wszystkie tablice')}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  taskBoardTab === 'all'
+                    ? 'bg-slate-200 dark:bg-slate-705 text-slate-750 dark:text-slate-350 font-extrabold'
+                    : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
+                }`}>
+                  {projectTasks.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTaskBoardTab('todo')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  taskBoardTab === 'todo'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border-b-2 border-slate-450 dark:border-slate-500'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                <span>{t('To Do', 'Yapılacaklar', 'Do zrobienia')}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  taskBoardTab === 'todo'
+                    ? 'bg-slate-205 dark:bg-slate-700 text-slate-750 dark:text-slate-300 font-extrabold'
+                    : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
+                }`}>
+                  {tasksByStatus.todo.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTaskBoardTab('doing')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  taskBoardTab === 'doing'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border-b-2 border-blue-500'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span>{t('In Progress', 'Yapılıyor', 'W toku')}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  taskBoardTab === 'doing'
+                    ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 font-extrabold'
+                    : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
+                }`}>
+                  {tasksByStatus.doing.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTaskBoardTab('done')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  taskBoardTab === 'done'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border-b-2 border-emerald-500'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>{t('Completed', 'Bitenler', 'Ukończone')}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  taskBoardTab === 'done'
+                    ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-extrabold'
+                    : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
+                }`}>
+                  {tasksByStatus.done.length}
+                </span>
+              </button>
+            </div>
+
             {/* Tasks Kanban Columns */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 font-sans">
+            <div className={`grid gap-5 font-sans ${
+              taskBoardTab === 'all' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'
+            }`}>
               
               {/* YAPILACAKLAR COLUMN */}
-              <div className="bg-slate-50/40 p-4 rounded-2xl border border-slate-100/60 flex flex-col min-h-[400px]">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-slate-400" />
-                    {t('TO DO', 'YAPILACAKLAR', 'DO ZROBIENIA')}
-                  </h4>
-                  <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-500">
-                    {tasksByStatus.todo.length}
-                  </span>
-                </div>
+              {(taskBoardTab === 'all' || taskBoardTab === 'todo') && (
+                <div className="bg-slate-50/40 p-4 rounded-2xl border border-slate-100/60 flex flex-col min-h-[400px]">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-slate-400" />
+                      {t('TO DO', 'YAPILACAKLAR', 'DO ZROBIENIA')}
+                    </h4>
+                    <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-500">
+                      {tasksByStatus.todo.length}
+                    </span>
+                  </div>
 
-                <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
-                  {tasksByStatus.todo.length === 0 ? (
-                    <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                      {t('No registered tasks.', 'Kayıtlı görev yok.', 'Brak zarejestrowanych zadań.')}
-                    </div>
-                  ) : (
-                    tasksByStatus.todo.map((tk) => (
-                      <TaskCard 
-                        key={tk.id} 
-                        task={tk} 
-                        onEdit={handleOpenEditTask}
-                        onDelete={handleTriggerDeleteTask}
-                        onShiftStatus={(x) => handleStatusShift(x, 'doing')}
-                        badgeClass={getPriorityBadgeClass}
-                        priorityLabel={getPriorityLabel}
-                        nextStatusLabel={t('Start Work', 'Çalışmayı Başlat', 'Rozpocznij pracę')}
-                        lang={activeSettings.lang}
-                        settings={activeSettings}
-                      />
-                    ))
-                  )}
+                  <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
+                    {tasksByStatus.todo.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
+                        {t('No registered tasks.', 'Kayıtlı görev yok.', 'Brak zarejestrowanych zadań.')}
+                      </div>
+                    ) : (
+                      tasksByStatus.todo.map((tk) => (
+                        <TaskCard 
+                          key={tk.id} 
+                          task={tk} 
+                          onEdit={handleOpenEditTask}
+                          onDelete={handleTriggerDeleteTask}
+                          onShiftStatus={(x) => handleStatusShift(x, 'doing')}
+                          badgeClass={getPriorityBadgeClass}
+                          priorityLabel={getPriorityLabel}
+                          nextStatusLabel={t('Start Work', 'Çalışmayı Başlat', 'Rozpocznij pracę')}
+                          lang={activeSettings.lang}
+                          settings={activeSettings}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* YAPILIYOR COLUMN */}
-              <div className="bg-blue-50/20 p-4 rounded-2xl border border-blue-50/35 flex flex-col min-h-[400px]">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-bold text-blue-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                    {t('IN PROGRESS', 'YAPILIYOR', 'W TOKU')}
-                  </h4>
-                  <span className="bg-blue-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-blue-700">
-                    {tasksByStatus.doing.length}
-                  </span>
-                </div>
+              {(taskBoardTab === 'all' || taskBoardTab === 'doing') && (
+                <div className="bg-blue-50/20 p-4 rounded-2xl border border-blue-50/35 flex flex-col min-h-[400px]">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-bold text-blue-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                      {t('IN PROGRESS', 'YAPILIYOR', 'W TOKU')}
+                    </h4>
+                    <span className="bg-blue-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-blue-700">
+                      {tasksByStatus.doing.length}
+                    </span>
+                  </div>
 
-                <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
-                  {tasksByStatus.doing.length === 0 ? (
-                    <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                      {t('No tasks in progress.', 'Çalışılan görev yok.', 'Brak zadań w toku.')}
-                    </div>
-                  ) : (
-                    tasksByStatus.doing.map((tk) => (
-                      <TaskCard 
-                        key={tk.id} 
-                        task={tk} 
-                        onEdit={handleOpenEditTask}
-                        onDelete={handleTriggerDeleteTask}
-                        onShiftStatus={(x) => handleStatusShift(x, 'done')}
-                        badgeClass={getPriorityBadgeClass}
-                        priorityLabel={getPriorityLabel}
-                        nextStatusLabel={t('Mark as Completed', 'Tamamlandı Olarak İşaretle', 'Oznacz jako ukończone')}
-                        lang={activeSettings.lang}
-                        settings={activeSettings}
-                      />
-                    ))
-                  )}
+                  <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
+                    {tasksByStatus.doing.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
+                        {t('No tasks in progress.', 'Çalışılan görev yok.', 'Brak zadań w toku.')}
+                      </div>
+                    ) : (
+                      tasksByStatus.doing.map((tk) => (
+                        <TaskCard 
+                          key={tk.id} 
+                          task={tk} 
+                          onEdit={handleOpenEditTask}
+                          onDelete={handleTriggerDeleteTask}
+                          onShiftStatus={(x) => handleStatusShift(x, 'done')}
+                          badgeClass={getPriorityBadgeClass}
+                          priorityLabel={getPriorityLabel}
+                          nextStatusLabel={t('Mark as Completed', 'Tamamlandı Olarak İşaretle', 'Oznacz jako ukończone')}
+                          lang={activeSettings.lang}
+                          settings={activeSettings}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* BİTENLER COLUMN */}
-              <div className="bg-emerald-50/10 p-4 rounded-2xl border border-emerald-50/20 flex flex-col min-h-[400px]">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-bold text-emerald-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    {t('COMPLETED', 'BİTENLER', 'UKOŃCZONE')}
-                  </h4>
-                  <span className="bg-emerald-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-emerald-700">
-                    {tasksByStatus.done.length}
-                  </span>
-                </div>
+              {(taskBoardTab === 'all' || taskBoardTab === 'done') && (
+                <div className="bg-emerald-50/10 p-4 rounded-2xl border border-emerald-50/20 flex flex-col min-h-[400px]">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-bold text-emerald-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      {t('COMPLETED', 'BİTENLER', 'UKOŃCZONE')}
+                    </h4>
+                    <span className="bg-emerald-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-emerald-700">
+                      {tasksByStatus.done.length}
+                    </span>
+                  </div>
 
-                <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
-                  {tasksByStatus.done.length === 0 ? (
-                    <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                      {t('No completed tasks.', 'Tamamlanan görev yok.', 'Brak ukończonych zadań.')}
-                    </div>
-                  ) : (
-                    tasksByStatus.done.map((tk) => (
-                      <TaskCard 
-                        key={tk.id} 
-                        task={tk} 
-                        onEdit={handleOpenEditTask}
-                        onDelete={handleTriggerDeleteTask}
-                        badgeClass={getPriorityBadgeClass}
-                        priorityLabel={getPriorityLabel}
-                        isCompleted
-                        onShiftStatusBack={(x) => handleStatusShift(x, 'doing')}
-                        lang={activeSettings.lang}
-                        settings={activeSettings}
-                      />
-                    ))
-                  )}
+                  <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
+                    {tasksByStatus.done.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
+                        {t('No completed tasks.', 'Tamamlanan görev yok.', 'Brak ukończonych zadań.')}
+                      </div>
+                    ) : (
+                      tasksByStatus.done.map((tk) => (
+                        <TaskCard 
+                          key={tk.id} 
+                          task={tk} 
+                          onEdit={handleOpenEditTask}
+                          onDelete={handleTriggerDeleteTask}
+                          badgeClass={getPriorityBadgeClass}
+                          priorityLabel={getPriorityLabel}
+                          isCompleted
+                          onShiftStatusBack={(x) => handleStatusShift(x, 'doing')}
+                          lang={activeSettings.lang}
+                          settings={activeSettings}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
           </div>
