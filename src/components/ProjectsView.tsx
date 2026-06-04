@@ -544,13 +544,13 @@ export default function ProjectsView({
                       {t('No registered tasks.', 'Kayıtlı görev yok.', 'Brak zarejestrowanych zadań.')}
                     </div>
                   ) : (
-                    tasksByStatus.todo.map((t) => (
+                    tasksByStatus.todo.map((tk) => (
                       <TaskCard 
-                        key={t.id} 
-                        task={t} 
+                        key={tk.id} 
+                        task={tk} 
                         onEdit={handleOpenEditTask}
                         onDelete={handleTriggerDeleteTask}
-                        onShiftStatus={(t) => handleStatusShift(t, 'doing')}
+                        onShiftStatus={(x) => handleStatusShift(x, 'doing')}
                         badgeClass={getPriorityBadgeClass}
                         priorityLabel={getPriorityLabel}
                         nextStatusLabel={t('Start Work', 'Çalışmayı Başlat', 'Rozpocznij pracę')}
@@ -580,13 +580,13 @@ export default function ProjectsView({
                       {t('No tasks in progress.', 'Çalışılan görev yok.', 'Brak zadań w toku.')}
                     </div>
                   ) : (
-                    tasksByStatus.doing.map((t) => (
+                    tasksByStatus.doing.map((tk) => (
                       <TaskCard 
-                        key={t.id} 
-                        task={t} 
+                        key={tk.id} 
+                        task={tk} 
                         onEdit={handleOpenEditTask}
                         onDelete={handleTriggerDeleteTask}
-                        onShiftStatus={(t) => handleStatusShift(t, 'done')}
+                        onShiftStatus={(x) => handleStatusShift(x, 'done')}
                         badgeClass={getPriorityBadgeClass}
                         priorityLabel={getPriorityLabel}
                         nextStatusLabel={t('Mark as Completed', 'Tamamlandı Olarak İşaretle', 'Oznacz jako ukończone')}
@@ -616,16 +616,16 @@ export default function ProjectsView({
                       {t('No completed tasks.', 'Tamamlanan görev yok.', 'Brak ukończonych zadań.')}
                     </div>
                   ) : (
-                    tasksByStatus.done.map((t) => (
+                    tasksByStatus.done.map((tk) => (
                       <TaskCard 
-                        key={t.id} 
-                        task={t} 
+                        key={tk.id} 
+                        task={tk} 
                         onEdit={handleOpenEditTask}
                         onDelete={handleTriggerDeleteTask}
                         badgeClass={getPriorityBadgeClass}
                         priorityLabel={getPriorityLabel}
                         isCompleted
-                        onShiftStatusBack={(t) => handleStatusShift(t, 'doing')}
+                        onShiftStatusBack={(x) => handleStatusShift(x, 'doing')}
                         lang={activeSettings.lang}
                         settings={activeSettings}
                       />

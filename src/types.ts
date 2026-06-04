@@ -16,6 +16,7 @@ export type TaskStatus = 'todo' | 'doing' | 'done';
 export interface Task {
   id: string;
   projectId: string;
+  userId?: string;
   title: string;
   description: string;
   priority: TaskPriority;
@@ -39,6 +40,7 @@ export type MaterialStatus = 'planned' | 'purchased' | 'delivered';
 export interface Material {
   id: string;
   projectId: string;
+  userId?: string;
   title: string;
   category: MaterialCategory;
   vendor: string;
@@ -93,3 +95,39 @@ export interface AccountingSummary {
   totalReceived: number; // Funds we injected
   cashBalance: number;   // totalReceived - totalPaid
 }
+
+export interface ProposalTask {
+  id: string;
+  title: string;
+  description: string;
+  durationDays: number;
+  price: number;
+}
+
+export interface ProposalMaterial {
+  id: string;
+  title: string;
+  category: MaterialCategory;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+}
+
+export interface Proposal {
+  id: string;
+  userId: string;
+  clientName: string;
+  clientCompany?: string;
+  projectName: string;
+  projectDescription: string;
+  pricingType: 'project' | 'itemized';
+  totalProjectPrice: number;
+  tasks: ProposalTask[];
+  materials: ProposalMaterial[];
+  status: 'draft' | 'sent' | 'accepted' | 'declined';
+  createdAt: string;
+  validUntil: string;
+  notes?: string;
+  convertedToProjectId?: string;
+}
+

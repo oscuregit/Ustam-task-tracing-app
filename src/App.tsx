@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import ProjectsView from './components/ProjectsView';
+import ProposalsView from './components/ProposalsView';
 import BudgetView from './components/BudgetView';
 import AccountingView from './components/AccountingView';
 import SettingsView from './components/SettingsView';
@@ -659,6 +660,19 @@ export default function App() {
           </button>
 
           <button
+            id="tab-btn-proposals"
+            onClick={() => setActiveTab('proposals')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === 'proposals' 
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'proposals' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <FileText className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('proposals', settings.lang)}
+          </button>
+
+          <button
             id="tab-btn-budget"
             onClick={() => setActiveTab('budget')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
@@ -756,6 +770,18 @@ export default function App() {
                   onDeleteTask={handleDeleteTask}
                   initialSelectedProjectId={deepSelectProjectId}
                   settings={settings}
+                />
+              )}
+
+              {activeTab === 'proposals' && (
+                <ProposalsView 
+                  userUid={user.uid}
+                  userProfile={userProfile}
+                  projects={projects}
+                  tasks={tasks}
+                  materials={materials}
+                  settings={settings}
+                  onNavigate={handleDeepNavigate}
                 />
               )}
 

@@ -102,6 +102,24 @@ service cloud.firestore {
              (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
     }
 
+    function isValidProposal(data) {
+      return data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.clientName is string && data.clientName.size() <= 200 &&
+             data.projectName is string && data.projectName.size() <= 200 &&
+             data.pricingType in ['project', 'itemized'] &&
+             data.status in ['draft', 'sent', 'accepted', 'declined'] &&
+             data.createdAt is string && data.createdAt.size() <= 50 &&
+             data.validUntil is string && data.validUntil.size() <= 50 &&
+             (!('clientCompany' in data) || (data.clientCompany is string && data.clientCompany.size() <= 200)) &&
+             (!('projectDescription' in data) || (data.projectDescription is string && data.projectDescription.size() <= 2000)) &&
+             (!('totalProjectPrice' in data) || (data.totalProjectPrice is number && data.totalProjectPrice >= 0)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 4000)) &&
+             (!('convertedToProjectId' in data) || (data.convertedToProjectId is string && data.convertedToProjectId.size() <= 128)) &&
+             (!('tasks' in data) || (data.tasks is list && data.tasks.size() <= 100)) &&
+             (!('materials' in data) || (data.materials is list && data.materials.size() <= 100));
+    }
+
     // Collections matches
     match /users/{userId} {
       allow get: if isSignedIn() && request.auth.uid == userId;
@@ -141,6 +159,13 @@ service cloud.firestore {
       allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && isValidId(rectId) && isValidRecurringTransaction(incoming());
       allow update: if isSignedIn() && isValidId(rectId) && isValidRecurringTransaction(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /proposals/{proposalId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(proposalId) && isValidProposal(incoming());
+      allow update: if isSignedIn() && isValidId(proposalId) && isValidProposal(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 

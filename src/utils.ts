@@ -36,6 +36,7 @@ export function getTranslatedLabel(key: string, lang: 'tr' | 'en' | 'pl'): strin
   const dict: Record<string, { tr: string; en: string; pl: string }> = {
     dashboard: { tr: 'Genel Kontrol Paneli', en: 'Dashboard Overview', pl: 'Panel Główny' },
     projects: { tr: 'Projeler & Görevler', en: 'Projects & Tasks', pl: 'Projekty i Zadania' },
+    proposals: { tr: 'Teklifler & Hazırlık', en: 'Quotations & Proposals', pl: 'Oferty i Wyceny' },
     budget: { tr: 'Bütçe & Malzemeler', en: 'Budget & Materials', pl: 'Budżet i Materiały' },
     accounting: { tr: 'Muhasebe Defteri', en: 'Accounting Ledger', pl: 'Księga Rachunkowa' },
     settings: { tr: 'Uygulama Ayarları', en: 'System Settings', pl: 'Ustawienia Systemu' },
