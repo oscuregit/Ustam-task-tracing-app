@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "984508599718",
+    "project_id": "gen-lang-client-0717110256",
+    "storage_bucket": "gen-lang-client-0717110256.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:984508599718:android:placeholderappid",
+        "android_client_info": {
+          "package_name": "com.ustatakip.tadilat.widget"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "YOUR_FIREBASE_SECRET_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

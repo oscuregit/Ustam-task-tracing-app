@@ -129,6 +129,72 @@
         "convertedToProjectId": { "type": "string" }
       },
       "required": ["id", "userId", "clientName", "projectName", "pricingType", "status", "createdAt", "validUntil"]
+    },
+    "TimeLog": {
+      "title": "TimeLog",
+      "description": "Log of clock-in and clock-out details for calculating spent hours and minutes per project/task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" },
+        "durationMinutes": { "type": "number" }
+      },
+      "required": ["id", "userId", "projectId", "startTime"]
+    },
+    "CalendarEvent": {
+      "title": "CalendarEvent",
+      "description": "Regular calendar events for planning and keeping track of past/future jobs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "color": { "type": "string" }
+      },
+      "required": ["id", "userId", "projectId", "title", "startDate", "endDate"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Stores client details such as contact details, project history, and balances",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "company": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name"]
+    },
+    "Collaborator": {
+      "title": "Collaborator",
+      "description": "Stores project collaboration access rules for multi-user shared access",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Formed as projectId_userEmail" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "editor", "viewer"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "projectId", "ownerId", "userEmail", "role"]
     }
   },
   "firestore": {
@@ -159,6 +225,22 @@
     "proposals/{proposalId}": {
       "schema": "Proposal",
       "description": "Stores renovation proposals/quotations including tasks, specifications, and itemized materials"
+    },
+    "timeLogs/{logId}": {
+      "schema": "TimeLog",
+      "description": "Stores user work time logs for clock-in/out tracking on projects and tasks"
+    },
+    "calendarEvents/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "Stores user scheduled work events, site visit dates, and future/past job schedules"
+    },
+    "customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Stores details about clients and customers"
+    },
+    "collaborators/{collaboratorId}": {
+      "schema": "Collaborator",
+      "description": "Stores project shared roles and permission assignments"
     }
   }
 }

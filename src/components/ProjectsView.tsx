@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Project, ProjectStatus, Task, TaskPriority, TaskStatus, AppSettings, Transaction } from '../types';
+import { Project, ProjectStatus, Task, TaskPriority, TaskStatus, AppSettings, Transaction, Customer } from '../types';
 import { formatMoney, formatDate, toDbDate } from '../utils';
 import { 
   Building2, 
@@ -31,6 +31,7 @@ interface ProjectsViewProps {
   onAddTransaction?: (t: Omit<Transaction, 'id'>) => void;
   initialSelectedProjectId?: string;
   settings?: AppSettings;
+  customers?: Customer[];
 }
 
 export default function ProjectsView({
@@ -44,7 +45,8 @@ export default function ProjectsView({
   onDeleteTask,
   onAddTransaction,
   initialSelectedProjectId,
-  settings
+  settings,
+  customers
 }: ProjectsViewProps) {
   // Fallback settings state
   const activeSettings = settings || {
@@ -114,6 +116,8 @@ export default function ProjectsView({
   const [projStatus, setProjStatus] = useState<ProjectStatus>('planning');
   const [projStart, setProjStart] = useState('');
   const [projTarget, setProjTarget] = useState('');
+  const [projClientId, setProjClientId] = useState('');
+  const [projClientName, setProjClientName] = useState('');
 
   // Sate for adding a task
   const [taskTitle, setTaskTitle] = useState('');
@@ -154,6 +158,8 @@ export default function ProjectsView({
     setProjStatus('planning');
     setProjStart(new Date().toISOString().split('T')[0]);
     setProjTarget(new Date().toISOString().split('T')[0]);
+    setProjClientId('');
+    setProjClientName('');
     setIsProjectModalOpen(true);
   };
 
@@ -166,6 +172,8 @@ export default function ProjectsView({
     setProjStatus(p.status);
     setProjStart(p.startDate || '');
     setProjTarget(p.targetDate || '');
+    setProjClientId(p.clientId || '');
+    setProjClientName(p.clientName || '');
     setIsProjectModalOpen(true);
   };
 
@@ -194,6 +202,8 @@ export default function ProjectsView({
         status: projStatus,
         startDate: projStart,
         targetDate: projTarget,
+        clientId: projClientId || undefined,
+        clientName: projClientName || undefined,
       });
     } else {
       onAddProject({
@@ -203,6 +213,8 @@ export default function ProjectsView({
         status: projStatus,
         startDate: projStart,
         targetDate: projTarget,
+        clientId: projClientId || undefined,
+        clientName: projClientName || undefined,
       });
     }
     setIsProjectModalOpen(false);
@@ -441,9 +453,16 @@ export default function ProjectsView({
                     <Building2 className="text-amber-500 w-6 h-6 flex-shrink-0" />
                     {activeProject.name}
                   </h1>
-                  <span className="text-xs text-slate-450 font-medium font-mono">
-                    {t('PROJECT ID:', 'PROJE ID:', 'PROJEKT ID:')} {activeProject.id}
-                  </span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-450 font-medium">
+                    <span className="font-mono">{t('PROJECT ID:', 'PROJE ID:', 'PROJEKT ID:')} {activeProject.id}</span>
+                    {activeProject.clientName && (
+                      <span className="flex items-center gap-1">
+                        <span className="text-slate-300">|</span>
+                        <User className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-slate-600 font-semibold">{t('Client:', 'Müşteri:', 'Klient:')} {activeProject.clientName}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
@@ -773,6 +792,56 @@ export default function ProjectsView({
               </div>
 
               <form onSubmit={handleSaveProject} className="space-y-4">
+                {/* Client / Customer Selector */}
+                <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-150">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wide block">
+                    {t('Project Customer / Client', 'Müşteri / İş Sahibi', 'Klient / Właściciel')}
+                  </label>
+                  
+                  {customers && customers.length > 0 ? (
+                    <div className="space-y-2 text-xs">
+                      <select
+                        value={projClientId}
+                        onChange={(e) => {
+                          const cid = e.target.value;
+                          setProjClientId(cid);
+                          if (cid) {
+                            const found = customers.find(c => c.id === cid);
+                            if (found) setProjClientName(found.name);
+                          } else {
+                            setProjClientName('');
+                          }
+                        }}
+                        className="w-full text-xs px-3 py-2 rounded-lg border border-slate-250 bg-white focus:outline-hidden focus:border-amber-500 font-sans text-slate-800"
+                      >
+                        <option value="">{t('--- New/Unregistered Customer ---', '--- Kayıtlı Olmayan / Yeni Müşteri ---', '--- Nowy / Niezarejestrowany Klient ---')}</option>
+                        {customers.map(cust => (
+                          <option key={cust.id} value={cust.id}>{cust.name} ({cust.company || t('Individual', 'Bireysel', 'Indywidualny')})</option>
+                        ))}
+                      </select>
+
+                      {/* Manual input if no pre-registered customer selected */}
+                      {!projClientId && (
+                        <input
+                          type="text"
+                          value={projClientName}
+                          onChange={(e) => setProjClientName(e.target.value)}
+                          placeholder={t('Enter Client Name...', 'Müşteri Adı ve Soyadı...', 'Wpisz imię i nazwisko klienta...')}
+                          className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white focus:outline-hidden focus:border-amber-500 text-slate-800"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={projClientName}
+                      onChange={(e) => setProjClientName(e.target.value)}
+                      placeholder={t('e.g. Ahmet Yılmaz, John Doe etc.', 'Örn: Ahmet Yılmaz, John Doe vb.', 'Np. Jan Kowalski itp.')}
+                      className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-amber-500 bg-white text-slate-800"
+                    />
+                  )}
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600 uppercase">{t('Project Name', 'Proje Adı', 'Nazwa projektu')}</label>
                   <input 

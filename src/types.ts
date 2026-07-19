@@ -8,6 +8,8 @@ export interface Project {
   startDate: string;
   targetDate: string;
   allocatedBudget: number;
+  clientId?: string;
+  clientName?: string;
 }
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -118,6 +120,7 @@ export interface Proposal {
   userId: string;
   clientName: string;
   clientCompany?: string;
+  clientId?: string;
   projectName: string;
   projectDescription: string;
   pricingType: 'project' | 'itemized';
@@ -129,5 +132,51 @@ export interface Proposal {
   validUntil: string;
   notes?: string;
   convertedToProjectId?: string;
+}
+
+export interface TimeLog {
+  id: string;
+  userId: string;
+  projectId: string;
+  taskId?: string;
+  startTime: string; // ISO-8601 String
+  endTime?: string; // ISO-8601 String, empty if running
+  notes?: string;
+  durationMinutes?: number;
+}
+
+export interface CalendarEvent {
+  id: string;
+  userId: string;
+  projectId: string; // can match a Project ID, or 'none' for general
+  title: string;
+  description?: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  startTime?: string; // HH:MM, optional
+  endTime?: string; // HH:MM, optional
+  color?: string; // Tailwind bg class name or Hex
+}
+
+export interface Customer {
+  id: string;
+  userId: string;
+  name: string;
+  company?: string;
+  phone: string;
+  email: string;
+  address?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface Collaborator {
+  id: string; // Formed as projectId_userEmail
+  projectId: string;
+  projectName: string;
+  ownerId: string;
+  userEmail: string;
+  role: 'admin' | 'editor' | 'viewer';
+  createdAt: string;
 }
 

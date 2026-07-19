@@ -39,6 +39,9 @@ export function getTranslatedLabel(key: string, lang: 'tr' | 'en' | 'pl'): strin
     proposals: { tr: 'Teklifler & Hazırlık', en: 'Quotations & Proposals', pl: 'Oferty i Wyceny' },
     budget: { tr: 'Bütçe & Malzemeler', en: 'Budget & Materials', pl: 'Budżet i Materiały' },
     accounting: { tr: 'Muhasebe Defteri', en: 'Accounting Ledger', pl: 'Księga Rachunkowa' },
+    'time-management': { tr: 'Zaman Yönetimi', en: 'Time Management', pl: 'Zarządzanie Czasem' },
+    customers: { tr: 'Müşteri Yönetimi', en: 'Customer Management', pl: 'Zarządzanie Klientami' },
+    collaboration: { tr: 'Yetkilendirme', en: 'Authorization & Shares', pl: 'Uprawnienia i Współpraca' },
     settings: { tr: 'Uygulama Ayarları', en: 'System Settings', pl: 'Ustawienia Systemu' },
   };
   

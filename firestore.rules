@@ -120,6 +120,66 @@ service cloud.firestore {
              (!('materials' in data) || (data.materials is list && data.materials.size() <= 100));
     }
 
+    function isValidTimeLog(data) {
+      return data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.projectId is string && data.projectId.size() <= 128 &&
+             data.startTime is string && data.startTime.size() <= 50 &&
+             (!('taskId' in data) || (data.taskId is string && data.taskId.size() <= 128)) &&
+             (!('endTime' in data) || (data.endTime is string && data.endTime.size() <= 50)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+             (!('durationMinutes' in data) || (data.durationMinutes is number && data.durationMinutes >= 0));
+    }
+
+    function isValidCalendarEvent(data) {
+      return data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.projectId is string && data.projectId.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.startDate is string && data.startDate.size() <= 50 &&
+             data.endDate is string && data.endDate.size() <= 50 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+             (!('startTime' in data) || (data.startTime is string && data.startTime.size() <= 50)) &&
+             (!('endTime' in data) || (data.endTime is string && data.endTime.size() <= 50)) &&
+             (!('color' in data) || (data.color is string && data.color.size() <= 50));
+    }
+
+    function isValidCustomer(data) {
+      return data.userId == request.auth.uid &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             (!('company' in data) || (data.company is string && data.company.size() <= 200)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 100)) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 500)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50));
+    }
+
+    function isValidCollaborator(data) {
+      return data.ownerId == request.auth.uid &&
+             data.id is string && data.id.size() <= 200 &&
+             data.projectId is string && data.projectId.size() <= 128 &&
+             data.userEmail is string && data.userEmail.size() <= 100 &&
+             data.role in ['admin', 'editor', 'viewer'] &&
+             (!('projectName' in data) || (data.projectName is string && data.projectName.size() <= 200)) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50));
+    }
+
+    function isCollaborator(projectId) {
+      return isSignedIn() && 
+             'email' in request.auth.token && 
+             exists(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower()));
+    }
+
+    function getCollaboratorRole(projectId) {
+      return get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data.role;
+    }
+
+    function canWriteProject(projectId) {
+      return isCollaborator(projectId) && (getCollaboratorRole(projectId) == 'admin' || getCollaboratorRole(projectId) == 'editor');
+    }
+
     // Collections matches
     match /users/{userId} {
       allow get: if isSignedIn() && request.auth.uid == userId;
@@ -128,31 +188,31 @@ service cloud.firestore {
     }
 
     match /projects/{projectId} {
-      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(projectId));
       allow create: if isSignedIn() && isValidId(projectId) && isValidProject(incoming());
-      allow update: if isSignedIn() && isValidId(projectId) && isValidProject(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
+      allow update: if isSignedIn() && isValidId(projectId) && isValidProject(incoming()) && (existing().userId == request.auth.uid || canWriteProject(projectId));
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 
     match /tasks/{taskId} {
-      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming());
-      allow update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
+      allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
+      allow update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
     }
 
     match /materials/{materialId} {
-      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming());
-      allow update: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
+      allow create: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
+      allow update: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
     }
 
     match /transactions/{transactionId} {
-      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming());
-      allow update: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
+      allow create: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
+      allow update: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
     }
 
     match /recurringTransactions/{rectId} {
@@ -167,6 +227,34 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(proposalId) && isValidProposal(incoming());
       allow update: if isSignedIn() && isValidId(proposalId) && isValidProposal(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /timeLogs/{logId} {
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
+      allow create: if isSignedIn() && isValidId(logId) && isValidTimeLog(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
+      allow update: if isSignedIn() && isValidId(logId) && isValidTimeLog(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+    }
+
+    match /calendarEvents/{eventId} {
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
+      allow create: if isSignedIn() && isValidId(eventId) && isValidCalendarEvent(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
+      allow update: if isSignedIn() && isValidId(eventId) && isValidCalendarEvent(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+    }
+
+    match /customers/{customerId} {
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(customerId) && isValidCustomer(incoming());
+      allow update: if isSignedIn() && isValidId(customerId) && isValidCustomer(incoming()) && existing().userId == request.auth.uid && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /collaborators/{collaboratorId} {
+      allow get, list: if isSignedIn() && (resource.data.ownerId == request.auth.uid || ('email' in request.auth.token && resource.data.userEmail.lower() == request.auth.token.email.lower()));
+      allow create: if isSignedIn() && isValidId(collaboratorId) && isValidCollaborator(incoming());
+      allow update: if isSignedIn() && isValidId(collaboratorId) && isValidCollaborator(incoming()) && existing().ownerId == request.auth.uid && incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
     }
 
   }

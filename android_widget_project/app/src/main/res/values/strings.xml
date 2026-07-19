@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">Tadilat Takip Widget</string>
+    <string name="widget_title">Tadilat Şantiye Yönetimi</string>
+    <string name="widget_description">Aktif projelerinizi ve bekleyen şantiye görevlerinizi görebileceğiniz ana ekran widgetı.</string>
+    
+    <!-- Login Screen -->
+    <string name="title_login">Renovation Hub Giriş</string>
+    <string name="hint_email">E-posta Adresi</string>
+    <string name="hint_password">Şifre</string>
+    <string name="btn_login">Giriş Yap</string>
+    <string name="error_auth_failed">Kimlik doğrulama başarısız. Lütfen bilgilerinizi kontrol edin.</string>
+    <string name="error_empty_fields">Lütfen e-posta ve şifrenizi girin.</string>
+    <string name="title_loading">Veriler yükleniyor...</string>
+
+    <!-- Main Screen -->
+    <string name="txt_welcome">Hoş Geldiniz,</string>
+    <string name="txt_info">Bu uygulama, ana ekranınızdaki Tadilat Widget\'ının Firebase veritabanınıza güvenli bir şekilde bağlanmasını sağlar. Giriş yaptıktan sonra widget otomatik olarak projelerinizi listelemeye başlayacaktır.</string>
+    <string name="btn_logout">Oturumu Kapat</string>
+    <string name="btn_refresh_widget">Widget\'ı Güncelle</string>
+    <string name="txt_widget_added_tip">İpucu: Ana ekranınıza basılı tutarak "Tadilat Şantiye Yönetimi" widget\'ını ekleyebilirsiniz.</string>
+    
+    <!-- Widget Labels -->
+    <string name="lbl_active_projects">Aktif Projeler</string>
+    <string name="lbl_pending_tasks">Bekleyen Görevler</string>
+    <string name="lbl_no_tasks">Bekleyen şantiye görevi bulunmuyor.</string>
+    <string name="lbl_last_updated">Son Güncelleme: %s</string>
+</resources>

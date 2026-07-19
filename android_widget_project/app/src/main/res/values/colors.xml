@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#0F172A</color> <!-- Slate 900 -->
+    <color name="primary_light">#1E293B</color> <!-- Slate 800 -->
+    <color name="primary_accent">#3B82F6</color> <!-- Blue 500 -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    
+    <!-- UI Accents -->
+    <color name="bg_slate_card">#1E293B</color>
+    <color name="bg_widget">#0F172A</color>
+    <color name="text_slate_300">#CBD5E1</color>
+    <color name="text_slate_400">#94A3B8</color>
+    <color name="text_slate_500">#64748B</color>
+    
+    <color name="badge_todo_bg">#475569</color>
+    <color name="badge_doing_bg">#2563EB</color>
+    <color name="badge_done_bg">#10B981</color>
+    
+    <color name="priority_low">#94A3B8</color>
+    <color name="priority_medium">#3B82F6</color>
+    <color name="priority_high">#F59E0B</color>
+    <color name="priority_urgent">#EF4444</color>
+</resources>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Project, Task, Material, MaterialCategory, AppSettings, Proposal, ProposalTask, ProposalMaterial } from '../types';
+import { Project, Task, Material, MaterialCategory, AppSettings, Proposal, ProposalTask, ProposalMaterial, Customer } from '../types';
 import { formatMoney, translateCategory } from '../utils';
 import { 
   FileText, 
@@ -31,6 +31,7 @@ interface ProposalsViewProps {
   materials: Material[];
   settings: AppSettings;
   onNavigate: (tab: string, pid?: string) => void;
+  customers?: Customer[];
 }
 
 const CATEGORIES: MaterialCategory[] = [
@@ -51,7 +52,8 @@ export default function ProposalsView({
   tasks,
   materials,
   settings,
-  onNavigate
+  onNavigate,
+  customers
 }: ProposalsViewProps) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +64,7 @@ export default function ProposalsView({
 
   const [clientName, setClientName] = useState('');
   const [clientCompany, setClientCompany] = useState('');
+  const [clientClientId, setClientClientId] = useState('');
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [pricingType, setPricingType] = useState<'project' | 'itemized'>('project');
@@ -130,6 +133,7 @@ export default function ProposalsView({
     setEditorId(null);
     setClientName('');
     setClientCompany('');
+    setClientClientId('');
     setProjectName('');
     setProjectDescription('');
     setPricingType('project');
@@ -150,6 +154,7 @@ export default function ProposalsView({
     setEditorId(p.id);
     setClientName(p.clientName);
     setClientCompany(p.clientCompany || '');
+    setClientClientId(p.clientId || '');
     setProjectName(p.projectName);
     setProjectDescription(p.projectDescription || '');
     setPricingType(p.pricingType);
@@ -227,6 +232,7 @@ export default function ProposalsView({
       userId: userUid,
       clientName: clientName.trim(),
       clientCompany: clientCompany.trim() || undefined,
+      clientId: clientClientId || undefined,
       projectName: projectName.trim(),
       projectDescription: projectDescription.trim() || '',
       pricingType,
@@ -467,7 +473,9 @@ export default function ProposalsView({
         status: 'planning',
         startDate: new Date().toISOString().split('T')[0],
         targetDate: p.validUntil,
-        allocatedBudget: p.totalProjectPrice
+        allocatedBudget: p.totalProjectPrice,
+        clientId: p.clientId,
+        clientName: p.clientName
       };
       await setDoc(doc(db, 'projects', generatedProjectId), { ...newProject, userId: userUid });
 
@@ -795,6 +803,37 @@ export default function ProposalsView({
                     1. {t('Client & Renovation Goals', 'Müşteri ve Şantiye Başlığı', 'Klient i Cele Remontowe')}
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {customers && customers.length > 0 && (
+                      <div className="md:col-span-2 space-y-1 bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-150 dark:border-slate-800">
+                        <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                          {t('Select Registered Customer (Optional)', 'Kayıtlı Müşteri Seç (İsteğe Bağlı)', 'Wybierz zarejestrowanego klienta (Opcjonalnie)')}
+                        </label>
+                        <select
+                          value={clientClientId}
+                          onChange={(e) => {
+                            const cid = e.target.value;
+                            setClientClientId(cid);
+                            if (cid) {
+                              const found = customers.find(c => c.id === cid);
+                              if (found) {
+                                setClientName(found.name);
+                                setClientCompany(found.company || '');
+                              }
+                            } else {
+                              setClientName('');
+                              setClientCompany('');
+                            }
+                          }}
+                          className="w-full text-xs p-2.5 rounded-xl border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 font-sans cursor-pointer text-slate-850 dark:text-slate-100 focus:outline-none focus:border-amber-500"
+                        >
+                          <option value="">{t('--- New/Unregistered Customer ---', '--- Kayıtlı Olmayan / Yeni Müşteri ---', '--- Nowy / Niezarejestrowany Klient ---')}</option>
+                          {customers.map(cust => (
+                            <option key={cust.id} value={cust.id}>{cust.name} ({cust.company || t('Individual', 'Bireysel', 'Indywidualny')})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-500">{t('Client Name *', 'Müşteri Adı / Unvanı *', 'Nazwa Klienta *')}</label>
                       <input

@@ -5,7 +5,10 @@ import {
   Material, 
   Transaction,
   MaterialStatus,
-  AppSettings
+  AppSettings,
+  Customer,
+  Collaborator,
+  Proposal
 } from './types';
 import { 
   INITIAL_PROJECTS, 
@@ -20,12 +23,14 @@ import {
   ShoppingBag, 
   Calculator,
   User,
+  Users,
   LogOut,
   Sparkles,
   Layers,
   CheckCircle2,
   Calendar,
   AlertOctagon,
+  Clock,
   Settings as SettingsIcon
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
@@ -33,8 +38,11 @@ import ProjectsView from './components/ProjectsView';
 import ProposalsView from './components/ProposalsView';
 import BudgetView from './components/BudgetView';
 import AccountingView from './components/AccountingView';
+import TimeManagementView from './components/TimeManagementView';
 import SettingsView from './components/SettingsView';
 import LoginView from './components/LoginView';
+import CustomerManagementView from './components/CustomerManagementView';
+import CollaborationView from './components/CollaborationView';
 import { getTranslatedLabel } from './utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -65,6 +73,15 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [collaborations, setCollaborations] = useState<Collaborator[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+
+  // States for shared collaborations data
+  const [sharedProjects, setSharedProjects] = useState<Project[]>([]);
+  const [sharedTasks, setSharedTasks] = useState<Task[]>([]);
+  const [sharedMaterials, setSharedMaterials] = useState<Material[]>([]);
+  const [sharedTransactions, setSharedTransactions] = useState<Transaction[]>([]);
 
   const [settings, setSettings] = useState<AppSettings>({
     lang: 'en',
@@ -246,13 +263,190 @@ export default function App() {
       handleFirestoreError(error, OperationType.GET, 'transactions');
     });
 
+    // Baseline listener for registered Customers
+    const qCustomers = query(collection(db, 'customers'), where('userId', '==', uid));
+    const unsubscribeCustomers = onSnapshot(qCustomers, (snapshot) => {
+      const items: Customer[] = [];
+      snapshot.forEach(docSnap => {
+        items.push(docSnap.data() as Customer);
+      });
+      setCustomers(items);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'customers');
+    });
+
+    // Baseline listener for Proposals
+    const qProposals = query(collection(db, 'proposals'), where('userId', '==', uid));
+    const unsubscribeProposals = onSnapshot(qProposals, (snapshot) => {
+      const items: Proposal[] = [];
+      snapshot.forEach(docSnap => {
+        items.push(docSnap.data() as Proposal);
+      });
+      setProposals(items);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'proposals');
+    });
+
+    // 1. My Shares (collaborations owned by me)
+    const qMyShares = query(collection(db, 'collaborators'), where('ownerId', '==', uid));
+    const unsubscribeMyShares = onSnapshot(qMyShares, (snapshot) => {
+      const mySharesList: Collaborator[] = [];
+      snapshot.forEach(docSnap => {
+        mySharesList.push(docSnap.data() as Collaborator);
+      });
+      setCollaborations(prev => {
+        const invited = prev.filter(c => c.ownerId !== uid);
+        return [...invited, ...mySharesList];
+      });
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'my_shares');
+    });
+
+    // 2. Shares with Me (collaborations where I am the guest)
+    const emailClean = user.email ? user.email.toLowerCase().trim() : '';
+    const qSharesWithMe = query(collection(db, 'collaborators'), where('userEmail', '==', emailClean));
+    const unsubscribeSharesWithMe = onSnapshot(qSharesWithMe, (snapshot) => {
+      const sharesWithMeList: Collaborator[] = [];
+      snapshot.forEach(docSnap => {
+        sharesWithMeList.push(docSnap.data() as Collaborator);
+      });
+      setCollaborations(prev => {
+        const owned = prev.filter(c => c.ownerId === uid);
+        return [...owned, ...sharesWithMeList];
+      });
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'shares_with_me');
+    });
+
     return () => {
       unsubscribeProjects();
       unsubscribeTasks();
       unsubscribeMaterials();
       unsubscribeTransactions();
+      unsubscribeCustomers();
+      unsubscribeProposals();
+      unsubscribeMyShares();
+      unsubscribeSharesWithMe();
     };
   }, [user, userProfile]);
+
+  // Extract project IDs that are shared with me
+  const sharedProjectIds = useMemo(() => {
+    if (!user?.email) return [];
+    const emailClean = user.email.toLowerCase().trim();
+    return collaborations
+      .filter(c => c.userEmail.toLowerCase().trim() === emailClean)
+      .map(c => c.projectId);
+  }, [collaborations, user]);
+
+  // Listen in real-time to shared project details, tasks, materials, and transactions
+  useEffect(() => {
+    if (!user || sharedProjectIds.length === 0) {
+      setSharedProjects([]);
+      setSharedTasks([]);
+      setSharedMaterials([]);
+      setSharedTransactions([]);
+      return;
+    }
+
+    const unsubscribes: (() => void)[] = [];
+    const projectsMap = new Map<string, Project>();
+    const tasksMap = new Map<string, Task[]>();
+    const materialsMap = new Map<string, Material[]>();
+    const transactionsMap = new Map<string, Transaction[]>();
+
+    sharedProjectIds.forEach(pid => {
+      // 1. Listen to Project doc
+      const unsubProj = onSnapshot(doc(db, 'projects', pid), (docSnap) => {
+        if (docSnap.exists()) {
+          projectsMap.set(pid, docSnap.data() as Project);
+          setSharedProjects(Array.from(projectsMap.values()));
+        }
+      });
+      unsubscribes.push(unsubProj);
+
+      // 2. Listen to Tasks of this project
+      const qTasks = query(collection(db, 'tasks'), where('projectId', '==', pid));
+      const unsubTasks = onSnapshot(qTasks, (snapshot) => {
+        const tList: Task[] = [];
+        snapshot.forEach(snap => {
+          tList.push(snap.data() as Task);
+        });
+        tasksMap.set(pid, tList);
+        setSharedTasks(Array.from(tasksMap.values()).flat());
+      });
+      unsubscribes.push(unsubTasks);
+
+      // 3. Listen to Materials of this project
+      const qMats = query(collection(db, 'materials'), where('projectId', '==', pid));
+      const unsubMats = onSnapshot(qMats, (snapshot) => {
+        const mList: Material[] = [];
+        snapshot.forEach(snap => {
+          mList.push(snap.data() as Material);
+        });
+        materialsMap.set(pid, mList);
+        setSharedMaterials(Array.from(materialsMap.values()).flat());
+      });
+      unsubscribes.push(unsubMats);
+
+      // 4. Listen to Transactions of this project
+      const qTrans = query(collection(db, 'transactions'), where('projectId', '==', pid));
+      const unsubTrans = onSnapshot(qTrans, (snapshot) => {
+        const trList: Transaction[] = [];
+        snapshot.forEach(snap => {
+          trList.push(snap.data() as Transaction);
+        });
+        transactionsMap.set(pid, trList);
+        setSharedTransactions(Array.from(transactionsMap.values()).flat());
+      });
+      unsubscribes.push(unsubTrans);
+    });
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [user, sharedProjectIds]);
+
+  // Combined Reactive Merged States
+  const allProjects = useMemo(() => {
+    const combined = [...projects, ...sharedProjects];
+    const seen = new Set<string>();
+    return combined.filter(p => {
+      if (!p.id || seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  }, [projects, sharedProjects]);
+
+  const allTasks = useMemo(() => {
+    const combined = [...tasks, ...sharedTasks];
+    const seen = new Set<string>();
+    return combined.filter(t => {
+      if (!t.id || seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  }, [tasks, sharedTasks]);
+
+  const allMaterials = useMemo(() => {
+    const combined = [...materials, ...sharedMaterials];
+    const seen = new Set<string>();
+    return combined.filter(m => {
+      if (!m.id || seen.has(m.id)) return false;
+      seen.add(m.id);
+      return true;
+    });
+  }, [materials, sharedMaterials]);
+
+  const allTransactions = useMemo(() => {
+    const combined = [...transactions, ...sharedTransactions];
+    const seen = new Set<string>();
+    return combined.filter(tr => {
+      if (!tr.id || seen.has(tr.id)) return false;
+      seen.add(tr.id);
+      return true;
+    });
+  }, [transactions, sharedTransactions]);
 
   // Sync settings actions back to User Profiles
   const saveSettings = async (newSettings: AppSettings) => {
@@ -699,6 +893,45 @@ export default function App() {
           </button>
 
           <button
+            id="tab-btn-time-management"
+            onClick={() => setActiveTab('time-management')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === 'time-management' 
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white'
+            }`}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'time-management' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <Clock className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('time-management', settings.lang)}
+          </button>
+
+          <button
+            id="tab-btn-customers"
+            onClick={() => setActiveTab('customers')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === 'customers' 
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white'
+            }`}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'customers' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <User className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('customers', settings.lang)}
+          </button>
+
+          <button
+            id="tab-btn-collaboration"
+            onClick={() => setActiveTab('collaboration')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === 'collaboration' 
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white'
+            }`}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'collaboration' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <Users className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('collaboration', settings.lang)}
+          </button>
+
+          <button
             id="tab-btn-settings"
             onClick={() => setActiveTab('settings')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
@@ -749,10 +982,10 @@ export default function App() {
             >
               {activeTab === 'dashboard' && (
                 <Dashboard 
-                  projects={projects}
-                  tasks={tasks}
-                  materials={materials}
-                  transactions={transactions}
+                  projects={allProjects}
+                  tasks={allTasks}
+                  materials={allMaterials}
+                  transactions={allTransactions}
                   onNavigate={handleDeepNavigate}
                   settings={settings}
                 />
@@ -760,8 +993,8 @@ export default function App() {
 
               {activeTab === 'projects' && (
                 <ProjectsView 
-                  projects={projects}
-                  tasks={tasks}
+                  projects={allProjects}
+                  tasks={allTasks}
                   onAddProject={handleAddProject}
                   onUpdateProject={handleUpdateProject}
                   onDeleteProject={handleDeleteProject}
@@ -770,6 +1003,7 @@ export default function App() {
                   onDeleteTask={handleDeleteTask}
                   initialSelectedProjectId={deepSelectProjectId}
                   settings={settings}
+                  customers={customers}
                 />
               )}
 
@@ -777,18 +1011,19 @@ export default function App() {
                 <ProposalsView 
                   userUid={user.uid}
                   userProfile={userProfile}
-                  projects={projects}
-                  tasks={tasks}
-                  materials={materials}
+                  projects={allProjects}
+                  tasks={allTasks}
+                  materials={allMaterials}
                   settings={settings}
                   onNavigate={handleDeepNavigate}
+                  customers={customers}
                 />
               )}
 
               {activeTab === 'budget' && (
                 <BudgetView 
-                  projects={projects}
-                  materials={materials}
+                  projects={allProjects}
+                  materials={allMaterials}
                   onAddMaterial={handleAddMaterial}
                   onUpdateMaterial={handleUpdateMaterial}
                   onDeleteMaterial={handleDeleteMaterial}
@@ -798,13 +1033,43 @@ export default function App() {
 
               {activeTab === 'accounting' && (
                 <AccountingView 
-                  projects={projects}
-                  transactions={transactions}
+                  projects={allProjects}
+                  transactions={allTransactions}
                   onAddTransaction={handleAddTransaction}
                   onUpdateTransaction={handleUpdateTransaction}
                   onDeleteTransaction={handleDeleteTransaction}
                   onImportBackup={handleImportBackup}
                   allDataExportString={allDataExportString}
+                  settings={settings}
+                />
+              )}
+
+              {activeTab === 'time-management' && (
+                <TimeManagementView 
+                  projects={allProjects}
+                  tasks={allTasks}
+                  settings={settings}
+                  userUid={user.uid}
+                />
+              )}
+
+              {activeTab === 'customers' && (
+                <CustomerManagementView 
+                  userUid={user.uid}
+                  customers={customers}
+                  projects={allProjects}
+                  proposals={proposals}
+                  transactions={allTransactions}
+                  settings={settings}
+                />
+              )}
+
+              {activeTab === 'collaboration' && (
+                <CollaborationView 
+                  userUid={user.uid}
+                  userEmail={user.email || ''}
+                  projects={projects}
+                  collaborations={collaborations}
                   settings={settings}
                 />
               )}
