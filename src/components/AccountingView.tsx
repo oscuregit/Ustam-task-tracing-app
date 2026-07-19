@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Project, Transaction, TransactionType, AppSettings } from '../types';
-import { formatMoney, formatDate, translateCategory } from '../utils';
+import { formatMoney, formatDate, translateCategory, getCollaboratorPermissions } from '../utils';
 import { 
   DollarSign, 
   Plus, 
@@ -20,7 +20,8 @@ import {
   AlertCircle,
   Edit3,
   AlertTriangle,
-  Settings
+  Settings,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -37,6 +38,8 @@ interface AccountingViewProps {
   onImportBackup: (importedData: { projects?: any[]; tasks?: any[]; materials?: any[]; transactions?: any[] }) => boolean;
   allDataExportString: string; // Ready loaded JSON dump
   settings?: AppSettings;
+  collaborations?: any[];
+  userEmail?: string;
 }
 
 const PAYMENT_METHODS = [
@@ -75,7 +78,9 @@ export default function AccountingView({
   onDeleteTransaction,
   onImportBackup,
   allDataExportString,
-  settings
+  settings,
+  collaborations,
+  userEmail
 }: AccountingViewProps) {
   // Fallback settings state
   const activeSettings = settings || {
@@ -220,15 +225,54 @@ export default function AccountingView({
   // Hidden File input ref for data restoring files
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const visibleProjects = useMemo(() => {
+    return projects.filter(proj => {
+      const collab = (collaborations || []).find(c => c.projectId === proj.id && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+      const perms = getCollaboratorPermissions(collab, !collab);
+      return perms.accounting !== 'hide';
+    });
+  }, [projects, collaborations, userEmail]);
+
+  const visibleProjectIds = useMemo(() => new Set(visibleProjects.map(p => p.id)), [visibleProjects]);
+
+  const getAccountingPermsForProject = (projId: string) => {
+    if (projId === 'global') {
+      const isCollab = (collaborations || []).some(c => c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+      if (!isCollab) {
+        return { canView: true, canEdit: true, canDelete: true };
+      }
+      const hasSomeAccess = visibleProjects.length > 0;
+      return { canView: hasSomeAccess, canEdit: false, canDelete: false };
+    }
+
+    const collab = (collaborations || []).find(c => c.projectId === projId && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+    const perms = getCollaboratorPermissions(collab, !collab);
+    return {
+      canView: perms.accounting !== 'hide',
+      canEdit: perms.accounting === 'full' || perms.accounting === 'edit',
+      canDelete: perms.accounting === 'full'
+    };
+  };
+
+  const activeProjectPermissions = useMemo(() => {
+    if (projectIdFilter === 'all' || projectIdFilter === 'global') return null;
+    const collab = (collaborations || []).find(c => c.projectId === projectIdFilter && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+    return getCollaboratorPermissions(collab, !collab);
+  }, [projectIdFilter, collaborations, userEmail]);
+
   // Filter transaction records
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
+      if (t.projectId !== 'global' && !visibleProjectIds.has(t.projectId)) return false;
+      const tPerms = getAccountingPermsForProject(t.projectId);
+      if (!tPerms.canView) return false;
+
       const matchProj = projectIdFilter === 'all' || t.projectId === projectIdFilter;
       const matchType = typeFilter === 'all' || t.type === typeFilter;
       const matchCat = categoryFilter === 'all' || t.category === categoryFilter;
       return matchProj && matchType && matchCat;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, projectIdFilter, typeFilter, categoryFilter]);
+  }, [transactions, projectIdFilter, typeFilter, categoryFilter, visibleProjectIds]);
 
   // Financial intelligence calculation block
   const balances = useMemo(() => {
@@ -237,6 +281,10 @@ export default function AccountingView({
 
     // Sum transactions belonging to selected projection view
     transactions.forEach((t) => {
+      if (t.projectId !== 'global' && !visibleProjectIds.has(t.projectId)) return;
+      const tPerms = getAccountingPermsForProject(t.projectId);
+      if (!tPerms.canView) return;
+
       const isMatchingProject = projectIdFilter === 'all' || t.projectId === projectIdFilter;
       if (!isMatchingProject) return;
 
@@ -254,7 +302,7 @@ export default function AccountingView({
     if (projectIdFilter !== 'all' && projectIdFilter !== 'global') {
       projectBudgetLimit = projects.find(p => p.id === projectIdFilter)?.allocatedBudget || 0;
     } else {
-      projectBudgetLimit = projects.reduce((sum, p) => sum + p.allocatedBudget, 0);
+      projectBudgetLimit = visibleProjects.reduce((sum, p) => sum + p.allocatedBudget, 0);
     }
 
     return {
@@ -264,7 +312,24 @@ export default function AccountingView({
       projectBudgetLimit,
       overspent: totalExpenses > projectBudgetLimit && projectBudgetLimit > 0,
     };
-  }, [transactions, projects, projectIdFilter]);
+  }, [transactions, projects, projectIdFilter, visibleProjects, visibleProjectIds]);
+
+  const canAddTransaction = useMemo(() => {
+    if (projectIdFilter !== 'all') {
+      return getAccountingPermsForProject(projectIdFilter).canEdit;
+    }
+    return visibleProjects.some(proj => {
+      return getAccountingPermsForProject(proj.id).canEdit;
+    });
+  }, [projectIdFilter, visibleProjects, collaborations, userEmail]);
+
+  const addableProjects = useMemo(() => {
+    return visibleProjects.filter(proj => {
+      const collab = (collaborations || []).find(c => c.projectId === proj.id && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+      const perms = getCollaboratorPermissions(collab, !collab);
+      return perms.accounting === 'full' || perms.accounting === 'edit';
+    });
+  }, [visibleProjects, collaborations, userEmail]);
 
   const handleOpenAdd = (type: TransactionType = 'expense') => {
     setEditingTransaction(null);
@@ -434,6 +499,26 @@ export default function AccountingView({
     linkElement.click();
   };
 
+  if (projectIdFilter !== 'all' && projectIdFilter !== 'global' && activeProjectPermissions?.accounting === 'hide') {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4 shadow-sm max-w-md mx-auto my-12 font-sans">
+        <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+          <EyeOff className="w-8 h-8" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900">
+          {t('Access Restricted', 'Yetkiniz Yok', 'Brak dostępu')}
+        </h3>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          {t(
+            'You do not have permission to view the financial and accounting details of this project.',
+            'Bu projenin finansal ve muhasebe detaylarını görüntüleme yetkiniz bulunmamaktadır.',
+            'Nie masz uprawnień do przeglądania szczegółów finansowych i księgowych tego projektu.'
+          )}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       
@@ -473,7 +558,7 @@ export default function AccountingView({
             >
               <option value="all">{t('General Ledger (All Projects)', 'Genel Muhasebe (Tüm İşler)', 'Księga Główna (Wszystkie Projekty)')}</option>
               <option value="global">{t('Independent Expenses / General Only', 'Sadece Bağımsız Giderler / Genel', 'Tylko Niezależne Wydatki / Ogólne')}</option>
-              {projects.map(p => (
+              {visibleProjects.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
@@ -842,22 +927,24 @@ export default function AccountingView({
             <FileText className="w-5 h-5 text-slate-500" /> {t('Financial Ledger Transactions', 'Finansal Defter Kayıtları', 'Ewidencja Transakcji Finansowych')}
           </h3>
           
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <button 
-              id="acc-add-income-btn"
-              onClick={() => handleOpenAdd('income')}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-800 border border-emerald-200 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" /> {t('Add Budget / Income', 'Bütçe Ekle', 'Dodaj Przychód')}
-            </button>
-            <button 
-              id="acc-add-expense-btn"
-              onClick={() => handleOpenAdd('expense')}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-800 border border-red-200 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" /> {t('Add Expense', 'Gider Ekle', 'Dodaj Wydatek')}
-            </button>
-          </div>
+          {canAddTransaction && (
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+              <button 
+                id="acc-add-income-btn"
+                onClick={() => handleOpenAdd('income')}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-800 border border-emerald-200 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> {t('Add Budget / Income', 'Bütçe Ekle', 'Dodaj Przychód')}
+              </button>
+              <button 
+                id="acc-add-expense-btn"
+                onClick={() => handleOpenAdd('expense')}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-800 border border-red-200 font-bold px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> {t('Add Expense', 'Gider Ekle', 'Dodaj Wydatek')}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Ledger table filters */}
@@ -919,6 +1006,10 @@ export default function AccountingView({
                   const correlatedProj = projects.find(p => p.id === tItem.projectId)?.name || 
                     (tItem.projectId === 'global' ? t('General Overhead / Independent', 'Genel Gider / Bağımsız', 'Ogólne koszty stałe / Niezależne') : t('Unknown Project', 'Bilinmeyen Proje', 'Nieznany projekt'));
 
+                  const tPerms = getAccountingPermsForProject(tItem.projectId);
+                  const txCanEdit = tPerms.canEdit;
+                  const txCanDelete = tPerms.canDelete;
+
                   // Helper for payment method labels
                   const getPaymentMethodLabel = (methodKey: string) => {
                     switch(methodKey) {
@@ -960,28 +1051,32 @@ export default function AccountingView({
                       </td>
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5">
-                          <button 
-                            id={`acc-ledger-edit-btn-${tItem.id}`}
-                            onClick={() => handleOpenEdit(tItem)}
-                            className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-amber-600 transition-colors cursor-pointer"
-                            title={t('Edit Transaction', 'İşlemi Düzenle', 'Edytuj Transakcję')}
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            id={`acc-ledger-delete-btn-${tItem.id}`}
-                            onClick={() => {
-                              setDeleteConfirmInfo({
-                                isOpen: true,
-                                id: tItem.id,
-                                title: tItem.title
-                              });
-                            }}
-                            className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-                            title={t('Delete Transaction', 'İşlemi Sil', 'Usuń Transakcję')}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {txCanEdit && (
+                            <button 
+                              id={`acc-ledger-edit-btn-${tItem.id}`}
+                              onClick={() => handleOpenEdit(tItem)}
+                              className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-amber-600 transition-colors cursor-pointer"
+                              title={t('Edit Transaction', 'İşlemi Düzenle', 'Edytuj Transakcję')}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {txCanDelete && (
+                            <button 
+                              id={`acc-ledger-delete-btn-${tItem.id}`}
+                              onClick={() => {
+                                setDeleteConfirmInfo({
+                                  isOpen: true,
+                                  id: tItem.id,
+                                  title: tItem.title
+                                });
+                              }}
+                              className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                              title={t('Delete Transaction', 'İşlemi Sil', 'Usuń Transakcję')}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1036,7 +1131,7 @@ export default function AccountingView({
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 tracking-wide block bg-slate-50/50 cursor-pointer"
                     >
                       <option value="global">{t('Unassigned / General', 'Eşlenmemiş / Genel', 'Nieprzypisane / Ogólne')}</option>
-                      {projects.map((p) => (
+                      {addableProjects.map((p) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>

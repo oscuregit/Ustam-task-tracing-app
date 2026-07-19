@@ -21,7 +21,11 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    function isValidCollaboratorId(id) {
+      return id is string && id.size() <= 200 && id.matches('^[a-zA-Z0-9_@.-]+$');
     }
 
     // Entity Validation Helpers
@@ -161,8 +165,9 @@ service cloud.firestore {
              data.id is string && data.id.size() <= 200 &&
              data.projectId is string && data.projectId.size() <= 128 &&
              data.userEmail is string && data.userEmail.size() <= 100 &&
-             data.role in ['admin', 'editor', 'viewer'] &&
+             data.role in ['admin', 'editor', 'viewer', 'custom'] &&
              (!('projectName' in data) || (data.projectName is string && data.projectName.size() <= 200)) &&
+             (!('permissions' in data) || (data.permissions is map)) &&
              (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50));
     }
 
@@ -174,6 +179,40 @@ service cloud.firestore {
 
     function getCollaboratorRole(projectId) {
       return get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data.role;
+    }
+
+    function hasFullPermission(projectId, module) {
+      return isCollaborator(projectId) && (
+        getCollaboratorRole(projectId) == 'admin' ||
+        (getCollaboratorRole(projectId) == 'custom' && 
+         'permissions' in get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data &&
+         module in get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data.permissions &&
+         get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data.permissions[module] == 'full')
+      );
+    }
+
+    function hasEditPermission(projectId, module) {
+      return isCollaborator(projectId) && (
+        getCollaboratorRole(projectId) == 'admin' ||
+        getCollaboratorRole(projectId) == 'editor' ||
+        (getCollaboratorRole(projectId) == 'custom' && 
+         'permissions' in get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data &&
+         module in get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data.permissions &&
+         (get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data.permissions[module] == 'full' ||
+          get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data.permissions[module] == 'edit'))
+      );
+    }
+
+    function hasViewPermission(projectId, module) {
+      return isCollaborator(projectId) && (
+        getCollaboratorRole(projectId) == 'admin' ||
+        getCollaboratorRole(projectId) == 'editor' ||
+        getCollaboratorRole(projectId) == 'viewer' ||
+        (getCollaboratorRole(projectId) == 'custom' && 
+         'permissions' in get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data &&
+         module in get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data.permissions &&
+         get(/databases/$(database)/documents/collaborators/$(projectId + "_" + request.auth.token.email.lower())).data.permissions[module] != 'hide')
+      );
     }
 
     function canWriteProject(projectId) {
@@ -188,31 +227,31 @@ service cloud.firestore {
     }
 
     match /projects/{projectId} {
-      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(projectId));
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || hasViewPermission(projectId, 'projectDetails'));
       allow create: if isSignedIn() && isValidId(projectId) && isValidProject(incoming());
-      allow update: if isSignedIn() && isValidId(projectId) && isValidProject(incoming()) && (existing().userId == request.auth.uid || canWriteProject(projectId));
+      allow update: if isSignedIn() && isValidId(projectId) && isValidProject(incoming()) && (existing().userId == request.auth.uid || hasEditPermission(projectId, 'projectDetails'));
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 
     match /tasks/{taskId} {
-      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
-      allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
-      allow update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
-      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || hasViewPermission(resource.data.projectId, 'tasks'));
+      allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) && (incoming().userId == request.auth.uid || hasEditPermission(incoming().projectId, 'tasks'));
+      allow update: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) && (existing().userId == request.auth.uid || hasEditPermission(existing().projectId, 'tasks'));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || hasFullPermission(existing().projectId, 'tasks'));
     }
 
     match /materials/{materialId} {
-      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
-      allow create: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
-      allow update: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
-      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || hasViewPermission(resource.data.projectId, 'budget'));
+      allow create: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming()) && (incoming().userId == request.auth.uid || hasEditPermission(incoming().projectId, 'budget'));
+      allow update: if isSignedIn() && isValidId(materialId) && isValidMaterial(incoming()) && (existing().userId == request.auth.uid || hasEditPermission(existing().projectId, 'budget'));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || hasFullPermission(existing().projectId, 'budget'));
     }
 
     match /transactions/{transactionId} {
-      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
-      allow create: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
-      allow update: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
-      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || hasViewPermission(resource.data.projectId, 'accounting'));
+      allow create: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && (incoming().userId == request.auth.uid || hasEditPermission(incoming().projectId, 'accounting'));
+      allow update: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && (existing().userId == request.auth.uid || hasEditPermission(existing().projectId, 'accounting'));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || hasFullPermission(existing().projectId, 'accounting'));
     }
 
     match /recurringTransactions/{rectId} {
@@ -230,17 +269,17 @@ service cloud.firestore {
     }
 
     match /timeLogs/{logId} {
-      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
-      allow create: if isSignedIn() && isValidId(logId) && isValidTimeLog(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
-      allow update: if isSignedIn() && isValidId(logId) && isValidTimeLog(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
-      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || hasViewPermission(resource.data.projectId, 'tasks'));
+      allow create: if isSignedIn() && isValidId(logId) && isValidTimeLog(incoming()) && (incoming().userId == request.auth.uid || hasEditPermission(incoming().projectId, 'tasks'));
+      allow update: if isSignedIn() && isValidId(logId) && isValidTimeLog(incoming()) && (existing().userId == request.auth.uid || hasEditPermission(existing().projectId, 'tasks'));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || hasFullPermission(existing().projectId, 'tasks'));
     }
 
     match /calendarEvents/{eventId} {
-      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isCollaborator(resource.data.projectId));
-      allow create: if isSignedIn() && isValidId(eventId) && isValidCalendarEvent(incoming()) && (incoming().userId == request.auth.uid || canWriteProject(incoming().projectId));
-      allow update: if isSignedIn() && isValidId(eventId) && isValidCalendarEvent(incoming()) && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
-      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || canWriteProject(existing().projectId));
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || hasViewPermission(resource.data.projectId, 'tasks'));
+      allow create: if isSignedIn() && isValidId(eventId) && isValidCalendarEvent(incoming()) && (incoming().userId == request.auth.uid || hasEditPermission(incoming().projectId, 'tasks'));
+      allow update: if isSignedIn() && isValidId(eventId) && isValidCalendarEvent(incoming()) && (existing().userId == request.auth.uid || hasEditPermission(existing().projectId, 'tasks'));
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || hasFullPermission(existing().projectId, 'tasks'));
     }
 
     match /customers/{customerId} {
@@ -252,8 +291,8 @@ service cloud.firestore {
 
     match /collaborators/{collaboratorId} {
       allow get, list: if isSignedIn() && (resource.data.ownerId == request.auth.uid || ('email' in request.auth.token && resource.data.userEmail.lower() == request.auth.token.email.lower()));
-      allow create: if isSignedIn() && isValidId(collaboratorId) && isValidCollaborator(incoming());
-      allow update: if isSignedIn() && isValidId(collaboratorId) && isValidCollaborator(incoming()) && existing().ownerId == request.auth.uid && incoming().ownerId == existing().ownerId;
+      allow create: if isSignedIn() && isValidCollaboratorId(collaboratorId) && isValidCollaborator(incoming());
+      allow update: if isSignedIn() && isValidCollaboratorId(collaboratorId) && isValidCollaborator(incoming()) && existing().ownerId == request.auth.uid && incoming().ownerId == existing().ownerId;
       allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
     }
 

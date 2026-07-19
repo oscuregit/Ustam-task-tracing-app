@@ -170,13 +170,23 @@ export interface Customer {
   createdAt: string;
 }
 
+export type PermissionLevel = 'full' | 'view' | 'edit' | 'hide';
+
+export interface CollaboratorPermissions {
+  projectDetails: PermissionLevel;
+  tasks: PermissionLevel;
+  budget: PermissionLevel;
+  accounting: PermissionLevel;
+}
+
 export interface Collaborator {
   id: string; // Formed as projectId_userEmail
   projectId: string;
   projectName: string;
   ownerId: string;
   userEmail: string;
-  role: 'admin' | 'editor' | 'viewer';
+  role: 'admin' | 'editor' | 'viewer' | 'custom';
+  permissions?: CollaboratorPermissions;
   createdAt: string;
 }
 

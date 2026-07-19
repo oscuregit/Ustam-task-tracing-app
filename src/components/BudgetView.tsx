@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Project, Material, MaterialCategory, MaterialStatus, AppSettings } from '../types';
-import { formatMoney, translateCategory } from '../utils';
+import { Project, Material, MaterialCategory, MaterialStatus, AppSettings, Collaborator, PermissionLevel } from '../types';
+import { formatMoney, translateCategory, getCollaboratorPermissions } from '../utils';
 import { 
   Building2, 
   Plus, 
@@ -17,7 +17,8 @@ import {
   Layers,
   Search,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -28,6 +29,8 @@ interface BudgetViewProps {
   onUpdateMaterial: (m: Material) => void;
   onDeleteMaterial: (materialId: string) => void;
   settings?: AppSettings;
+  collaborations?: Collaborator[];
+  userEmail?: string;
 }
 
 const CATEGORIES: MaterialCategory[] = [
@@ -47,7 +50,9 @@ export default function BudgetView({
   onAddMaterial,
   onUpdateMaterial,
   onDeleteMaterial,
-  settings
+  settings,
+  collaborations = [],
+  userEmail = ''
 }: BudgetViewProps) {
   // Fallback settings state
   const activeSettings = settings || {
@@ -97,9 +102,38 @@ export default function BudgetView({
   const [formIsPaid, setFormIsPaid] = useState(true);
   const [formPurchaseDate, setFormPurchaseDate] = useState('');
 
+  // Filter out any projects where budget permission is 'hide'
+  const visibleProjects = useMemo(() => {
+    return projects.filter(proj => {
+      const collab = (collaborations || []).find(c => c.projectId === proj.id && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+      const perms = getCollaboratorPermissions(collab, !collab);
+      return perms.budget !== 'hide';
+    });
+  }, [projects, collaborations, userEmail]);
+
+  const visibleProjectIds = useMemo(() => new Set(visibleProjects.map(p => p.id)), [visibleProjects]);
+
+  const activeProjectPermissions = useMemo(() => {
+    if (selectedProjectId === 'all') return null;
+    const collab = (collaborations || []).find(c => c.projectId === selectedProjectId && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+    return getCollaboratorPermissions(collab, !collab);
+  }, [selectedProjectId, collaborations, userEmail]);
+
+  const canAddMaterial = useMemo(() => {
+    if (selectedProjectId !== 'all') {
+      return activeProjectPermissions?.budget === 'full' || activeProjectPermissions?.budget === 'edit';
+    }
+    return visibleProjects.some(proj => {
+      const collab = (collaborations || []).find(c => c.projectId === proj.id && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+      const perms = getCollaboratorPermissions(collab, !collab);
+      return perms.budget === 'full' || perms.budget === 'edit';
+    });
+  }, [selectedProjectId, activeProjectPermissions, visibleProjects, collaborations, userEmail]);
+
   // Filter materials based on user interaction
   const filteredMaterials = useMemo(() => {
     return materials.filter((m) => {
+      if (!visibleProjectIds.has(m.projectId)) return false;
       const matchProj = selectedProjectId === 'all' || m.projectId === selectedProjectId;
       const matchCat = selectedCategory === 'all' || m.category === selectedCategory;
       const matchStatus = selectedStatus === 'all' || m.status === selectedStatus;
@@ -109,7 +143,7 @@ export default function BudgetView({
 
       return matchProj && matchCat && matchStatus && matchSearch;
     });
-  }, [materials, selectedProjectId, selectedCategory, selectedStatus, searchTerm]);
+  }, [materials, visibleProjectIds, selectedProjectId, selectedCategory, selectedStatus, searchTerm]);
 
   // Aggregate stats based on matching filters
   const budgetStats = useMemo(() => {
@@ -258,6 +292,26 @@ export default function BudgetView({
     }
   };
 
+  if (selectedProjectId !== 'all' && activeProjectPermissions?.budget === 'hide') {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4 shadow-sm max-w-md mx-auto my-12 font-sans">
+        <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+          <EyeOff className="w-8 h-8" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900">
+          {t('Access Restricted', 'Yetkiniz Yok', 'Brak dostępu')}
+        </h3>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          {t(
+            'You do not have permission to view the budget details of this project.',
+            'Bu projenin bütçe detaylarını görüntüleme yetkiniz bulunmamaktadır.',
+            'Nie masz uprawnień do przeglądania szczegółów budżetu tego projektu.'
+          )}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Upper metrics row */}
@@ -380,13 +434,15 @@ export default function BudgetView({
               </div>
 
               {/* Action Buttons */}
-              <button 
-                id="budget-add-material-btn"
-                onClick={handleOpenAdd}
-                className="flex items-center gap-1.5 bg-amber-505 hover:bg-amber-600 bg-amber-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs cursor-pointer shadow-xs transition-transform hover:-translate-y-0.5 w-full md:w-auto justify-center"
-              >
-                <Plus className="w-4 h-4" /> {t('Add New Material Order', 'Yeni Malzeme Siparişi Ekle', 'Dodaj Nowe Zlecenie Materiałowe')}
-              </button>
+              {canAddMaterial && (
+                <button 
+                  id="budget-add-material-btn"
+                  onClick={handleOpenAdd}
+                  className="flex items-center gap-1.5 bg-amber-505 hover:bg-amber-600 bg-amber-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs cursor-pointer shadow-xs transition-transform hover:-translate-y-0.5 w-full md:w-auto justify-center"
+                >
+                  <Plus className="w-4 h-4" /> {t('Add New Material Order', 'Yeni Malzeme Siparişi Ekle', 'Dodaj Nowe Zlecenie Materiałowe')}
+                </button>
+              )}
             </div>
 
             {/* Selection tags controls */}
@@ -401,7 +457,7 @@ export default function BudgetView({
                   className="bg-slate-50 border border-slate-150 rounded-lg px-2 py-1 text-slate-700 focus:outline-none cursor-pointer max-w-[140px] truncate"
                 >
                   <option value="all">{t('All Projects', 'Tüm Projeler', 'Wszystkie Projekty')}</option>
-                  {projects.map(p => (
+                  {visibleProjects.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
@@ -456,6 +512,11 @@ export default function BudgetView({
                 const projName = projects.find(p => p.id === m.projectId)?.name || 'Bilinmeyen Proje';
                 const colors = getCategoryThemeColors(m.category);
 
+                const mCollab = (collaborations || []).find(c => c.projectId === m.projectId && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+                const mPerms = getCollaboratorPermissions(mCollab, !mCollab);
+                const mCanEdit = mPerms.budget === 'full' || mPerms.budget === 'edit';
+                const mCanDelete = mPerms.budget === 'full';
+
                 return (
                   <div 
                     key={m.id}
@@ -490,13 +551,19 @@ export default function BudgetView({
                       <div className="flex items-center gap-2">
                         {/* Status Switcher indicator badge or interactive check */}
                         {m.status === 'planned' ? (
-                          <button 
-                            id={`btn-mark-purchased-${m.id}`}
-                            onClick={() => changeMaterialStatus(m, 'purchased')}
-                            className="text-[10px] bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded font-bold cursor-pointer transition-colors border border-slate-200/50 dark:border-slate-700/60"
-                          >
-                            {t('Mark Purchased', 'Alındı İşaretle', 'Oznacz zakupione')}
-                          </button>
+                          mCanEdit ? (
+                            <button 
+                              id={`btn-mark-purchased-${m.id}`}
+                              onClick={() => changeMaterialStatus(m, 'purchased')}
+                              className="text-[10px] bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded font-bold cursor-pointer transition-colors border border-slate-200/50 dark:border-slate-700/60"
+                            >
+                              {t('Mark Purchased', 'Alındı İşaretle', 'Oznacz zakupione')}
+                            </button>
+                          ) : (
+                            <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">
+                              {t('Planned', 'Planlandı', 'Planowane')}
+                            </span>
+                          )
                         ) : (
                           <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
                             m.status === 'delivered' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300'
@@ -507,41 +574,55 @@ export default function BudgetView({
 
                         {/* Paid Toggle badge */}
                         {m.status !== 'planned' && (
-                          <button
-                            id={`btn-toggle-paid-${m.id}`}
-                            onClick={() => togglePaidStatus(m)}
-                            className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded cursor-pointer border ${
+                          mCanEdit ? (
+                            <button
+                              id={`btn-toggle-paid-${m.id}`}
+                              onClick={() => togglePaidStatus(m)}
+                              className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded cursor-pointer border ${
+                                m.isPaid 
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800' 
+                                  : 'bg-red-50 border-red-300 text-red-800 animate-pulse'
+                              }`}
+                              title={m.isPaid ? t('Paid (Logged as complete expense)', 'Tahsil Edildi (Gider Olarak Ödendi)', 'Opłacone (Zaksięgowane jako pełny wydatek)') : t('Awaiting payment! Click to change to Paid', 'Borç Olarak Bekliyor! Ödendi Olarak Değiştirmek İçin Dokun', 'Oczekuje na płatność! Kliknij, aby zmienić na Opłacone')}
+                            >
+                              {m.isPaid ? t('PAID', 'ÖDENDİ', 'OPŁACONE') : t('DEBT/CREDIT', 'VERESİYE/BORÇ', 'NA KREDYT')}
+                            </button>
+                          ) : (
+                            <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border ${
                               m.isPaid 
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800' 
-                                : 'bg-red-50 border-red-300 text-red-800 animate-pulse'
-                            }`}
-                            title={m.isPaid ? t('Paid (Logged as complete expense)', 'Tahsil Edildi (Gider Olarak Ödendi)', 'Opłacone (Zaksięgowane jako pełny wydatek)') : t('Awaiting payment! Click to change to Paid', 'Borç Olarak Bekliyor! Ödendi Olarak Değiştirmek İçin Dokun', 'Oczekuje na płatność! Kliknij, aby zmienić na Opłacone')}
-                          >
-                            {m.isPaid ? t('PAID', 'ÖDENDİ', 'OPŁACONE') : t('DEBT/CREDIT', 'VERESİYE/BORÇ', 'NA KREDYT')}
-                          </button>
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                                : 'bg-red-50 border-red-200 text-red-700'
+                            }`}>
+                              {m.isPaid ? t('PAID', 'ÖDENDİ', 'OPŁACONE') : t('DEBT/CREDIT', 'VERESİYE/BORÇ', 'NA KREDYT')}
+                            </span>
+                          )
                         )}
 
                         <div className="flex gap-1 pl-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            id={`btn-edit-mat-${m.id}`}
-                            onClick={() => handleOpenEdit(m)}
-                            className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-amber-600 transition-colors cursor-pointer"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            id={`btn-delete-mat-${m.id}`}
-                            onClick={() => {
-                              setDeleteConfirmInfo({
-                                isOpen: true,
-                                id: m.id,
-                                title: m.title
-                              });
-                            }}
-                            className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {mCanEdit && (
+                            <button 
+                              id={`btn-edit-mat-${m.id}`}
+                              onClick={() => handleOpenEdit(m)}
+                              className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-amber-600 transition-colors cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {mCanDelete && (
+                            <button 
+                              id={`btn-delete-mat-${m.id}`}
+                              onClick={() => {
+                                setDeleteConfirmInfo({
+                                  isOpen: true,
+                                  id: m.id,
+                                  title: m.title
+                                });
+                              }}
+                              className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -589,7 +670,7 @@ export default function BudgetView({
                       onChange={(e) => setFormProjId(e.target.value)}
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 tracking-wide block bg-slate-50/50 cursor-pointer"
                     >
-                      {projects.map((p) => (
+                      {visibleProjects.map((p) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>

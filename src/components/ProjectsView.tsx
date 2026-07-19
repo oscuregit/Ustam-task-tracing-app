@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Project, ProjectStatus, Task, TaskPriority, TaskStatus, AppSettings, Transaction, Customer } from '../types';
-import { formatMoney, formatDate, toDbDate } from '../utils';
+import { Project, ProjectStatus, Task, TaskPriority, TaskStatus, AppSettings, Transaction, Customer, Collaborator, PermissionLevel } from '../types';
+import { formatMoney, formatDate, toDbDate, getCollaboratorPermissions } from '../utils';
 import { 
   Building2, 
   Calendar, 
@@ -15,7 +15,8 @@ import {
   Filter,
   Check,
   Briefcase,
-  X
+  X,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -32,6 +33,8 @@ interface ProjectsViewProps {
   initialSelectedProjectId?: string;
   settings?: AppSettings;
   customers?: Customer[];
+  collaborations?: Collaborator[];
+  userEmail?: string;
 }
 
 export default function ProjectsView({
@@ -46,7 +49,9 @@ export default function ProjectsView({
   onAddTransaction,
   initialSelectedProjectId,
   settings,
-  customers
+  customers,
+  collaborations = [],
+  userEmail = ''
 }: ProjectsViewProps) {
   // Fallback settings state
   const activeSettings = settings || {
@@ -79,25 +84,47 @@ export default function ProjectsView({
     title: string;
   } | null>(null);
 
+  // Filter out any projects where projectDetails permission is 'hide'
+  const visibleProjects = useMemo(() => {
+    return projects.filter(proj => {
+      const collab = (collaborations || []).find(c => c.projectId === proj.id && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+      const perms = getCollaboratorPermissions(collab, !collab);
+      return perms.projectDetails !== 'hide';
+    });
+  }, [projects, collaborations, userEmail]);
+
   // If previous selection was deleted or null, auto-select first available one
   const activeProjectId = useMemo(() => {
-    if (selectedProjectId && projects.some(p => p.id === selectedProjectId)) {
+    if (selectedProjectId && visibleProjects.some(p => p.id === selectedProjectId)) {
       return selectedProjectId;
     }
-    return projects.length > 0 ? projects[0].id : null;
-  }, [projects, selectedProjectId]);
+    return visibleProjects.length > 0 ? visibleProjects[0].id : null;
+  }, [visibleProjects, selectedProjectId]);
 
   const activeProject = useMemo(() => {
-    return projects.find((p) => p.id === activeProjectId) || null;
-  }, [projects, activeProjectId]);
+    return visibleProjects.find((p) => p.id === activeProjectId) || null;
+  }, [visibleProjects, activeProjectId]);
+
+  const activeProjectPermissions = useMemo(() => {
+    if (!activeProject) {
+      return {
+        projectDetails: 'full' as PermissionLevel,
+        tasks: 'full' as PermissionLevel,
+        budget: 'full' as PermissionLevel,
+        accounting: 'full' as PermissionLevel
+      };
+    }
+    const collab = (collaborations || []).find(c => c.projectId === activeProject.id && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+    return getCollaboratorPermissions(collab, !collab);
+  }, [activeProject, collaborations, userEmail]);
 
   // Project Filtering
   const [projectStatusFilter, setProjectStatusFilter] = useState<string>('all');
 
   const filteredProjects = useMemo(() => {
-    if (projectStatusFilter === 'all') return projects;
-    return projects.filter((p) => p.status === projectStatusFilter);
-  }, [projects, projectStatusFilter]);
+    if (projectStatusFilter === 'all') return visibleProjects;
+    return visibleProjects.filter((p) => p.status === projectStatusFilter);
+  }, [visibleProjects, projectStatusFilter]);
 
   // Modals / Form States
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -405,9 +432,16 @@ export default function ProjectsView({
                     </div>
 
                     <div className="flex justify-between items-center text-[10px] text-slate-500">
-                      <span className="font-medium bg-slate-100 px-1.5 py-0.5 rounded-md text-slate-655 dark:bg-slate-800 dark:text-slate-350">
-                        {formatMoney(p.allocatedBudget, activeSettings)}
-                      </span>
+                      {(() => {
+                        const collab = (collaborations || []).find(c => c.projectId === p.id && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
+                        const perms = getCollaboratorPermissions(collab, !collab);
+                        const hideBudget = perms.budget === 'hide';
+                        return (
+                          <span className="font-medium bg-slate-100 px-1.5 py-0.5 rounded-md text-slate-655 dark:bg-slate-800 dark:text-slate-350">
+                            {hideBudget ? '****' : formatMoney(p.allocatedBudget, activeSettings)}
+                          </span>
+                        );
+                      })()}
                       <span className={`px-1.5 py-0.5 rounded bg-slate-50 border ${
                         p.status === 'completed' ? 'text-emerald-700 bg-emerald-50 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60' :
                         p.status === 'ongoing' ? 'text-blue-700 bg-blue-50 border-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/60' :
@@ -466,28 +500,32 @@ export default function ProjectsView({
                 </div>
 
                 <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
-                  <button 
-                    id="proj-edit-action-btn"
-                    onClick={() => handleOpenEditProject(activeProject)}
-                    className="p-2 text-slate-500 hover:text-amber-600 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors text-xs flex items-center gap-1 font-semibold cursor-pointer"
-                  >
-                    <Edit3 className="w-4 h-4" /> {t('Edit', 'Düzenle', 'Edytuj')}
-                  </button>
-                  <button 
-                    id="proj-delete-action-btn"
-                    onClick={() => {
-                      setDeleteConfirmInfo({
-                        isOpen: true,
-                        type: 'project',
-                        id: activeProject.id,
-                        title: activeProject.name
-                      });
-                    }}
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                    title={t('Delete Project', 'Projeyi Sil', 'Usuń Projekt')}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {(activeProjectPermissions.projectDetails === 'full' || activeProjectPermissions.projectDetails === 'edit') && (
+                    <button 
+                      id="proj-edit-action-btn"
+                      onClick={() => handleOpenEditProject(activeProject)}
+                      className="p-2 text-slate-500 hover:text-amber-600 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors text-xs flex items-center gap-1 font-semibold cursor-pointer"
+                    >
+                      <Edit3 className="w-4 h-4" /> {t('Edit', 'Düzenle', 'Edytuj')}
+                    </button>
+                  )}
+                  {activeProjectPermissions.projectDetails === 'full' && (
+                    <button 
+                      id="proj-delete-action-btn"
+                      onClick={() => {
+                        setDeleteConfirmInfo({
+                          isOpen: true,
+                          type: 'project',
+                          id: activeProject.id,
+                          title: activeProject.name
+                        });
+                      }}
+                      className="p-2 text-slate-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                      title={t('Delete Project', 'Projeyi Sil', 'Usuń Projekt')}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -501,7 +539,7 @@ export default function ProjectsView({
                 <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
                   <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Allocated Budget', 'Ayrılan Bütçe', 'Przydzielony budżet')}</span>
                   <span className="font-bold text-slate-700 dark:text-slate-200 text-sm font-mono">
-                    {formatMoney(activeProject.allocatedBudget, activeSettings)}
+                    {activeProjectPermissions.budget === 'hide' ? '****' : formatMoney(activeProject.allocatedBudget, activeSettings)}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
@@ -531,222 +569,244 @@ export default function ProjectsView({
               </div>
             </div>
 
-            {/* Task Board Management Header */}
-            <div className="flex justify-between items-center mt-8 mb-4 font-sans">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <CheckCircle2 className="text-blue-500 w-5 h-5" /> {t('Task Kanban Board', 'Görev Panosu', 'Tablica zadań')}
-              </h3>
-              <button 
-                id="task-board-add-btn"
-                onClick={handleOpenAddTask}
-                className="flex items-center gap-1.5 bg-slate-905 hover:bg-slate-850 bg-slate-900 text-white font-medium px-3.5 py-2 rounded-xl text-xs cursor-pointer shadow-xs transition-transform hover:-translate-y-0.5"
-              >
-                <Plus className="w-4 h-4" /> {t('Add New Task', 'Yeni Görev Ekle', 'Dodaj nowe zadanie')}
-              </button>
-            </div>
+              {/* Task Board Management Header & Body wrapped with permissions checks */}
+              {activeProjectPermissions.tasks === 'hide' ? (
+              <div className="bg-white p-12 rounded-2xl border border-slate-100 shadow-2xs text-center space-y-4 mt-8 font-sans">
+                <EyeOff className="w-12 h-12 text-slate-300 mx-auto" />
+                <h3 className="text-md font-bold text-slate-800">
+                  {t('Task Access Restricted', 'Bu Bölüme Erişim Yetkiniz Yok', 'Brak uprawnień do zadań')}
+                </h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                  {t('Your project collaborator role does not have permission to view or manage tasks for this project.', 'Proje yetkilendirmeniz bu projenin iş ve görevlerini görüntülemenize izin vermemektedir.', 'Twoja rola współpracownika nie pozwala na podgląd ani zarządzanie zadaniami dla tego projektu.')}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-center mt-8 mb-4 font-sans">
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <CheckCircle2 className="text-blue-500 w-5 h-5" /> {t('Task Kanban Board', 'Görev Panosu', 'Tablica zadań')}
+                  </h3>
+                  {(activeProjectPermissions.tasks === 'full' || activeProjectPermissions.tasks === 'edit') && (
+                    <button 
+                      id="task-board-add-btn"
+                      onClick={handleOpenAddTask}
+                      className="flex items-center gap-1.5 bg-slate-905 hover:bg-slate-850 bg-slate-900 text-white font-medium px-3.5 py-2 rounded-xl text-xs cursor-pointer shadow-xs transition-transform hover:-translate-y-0.5"
+                    >
+                      <Plus className="w-4 h-4" /> {t('Add New Task', 'Yeni Görev Ekle', 'Dodaj nowe zadanie')}
+                    </button>
+                  )}
+                </div>
 
-            {/* Segmented Task Board View Selector (Tabs) */}
-            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-150/40 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-2xl mb-6 font-sans w-fit max-w-full">
-              <button
-                type="button"
-                onClick={() => setTaskBoardTab('all')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  taskBoardTab === 'all'
-                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-100 dark:ring-slate-700'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
-                }`}
-              >
-                <span>{t('All Columns', 'Tüm Panolar', 'Wszystkie tablice')}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                  taskBoardTab === 'all'
-                    ? 'bg-slate-200 dark:bg-slate-705 text-slate-750 dark:text-slate-350 font-extrabold'
-                    : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
-                }`}>
-                  {projectTasks.length}
-                </span>
-              </button>
+                {/* Segmented Task Board View Selector (Tabs) */}
+                <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-150/40 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-2xl mb-6 font-sans w-fit max-w-full">
+                  <button
+                    type="button"
+                    onClick={() => setTaskBoardTab('all')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      taskBoardTab === 'all'
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-100 dark:ring-slate-700'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
+                    }`}
+                  >
+                    <span>{t('All Columns', 'Tüm Panolar', 'Wszystkie tablice')}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                      taskBoardTab === 'all'
+                        ? 'bg-slate-200 dark:bg-slate-705 text-slate-750 dark:text-slate-350 font-extrabold'
+                        : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
+                    }`}>
+                      {projectTasks.length}
+                    </span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setTaskBoardTab('todo')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  taskBoardTab === 'todo'
-                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border-b-2 border-slate-450 dark:border-slate-500'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                <span>{t('To Do', 'Yapılacaklar', 'Do zrobienia')}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                  taskBoardTab === 'todo'
-                    ? 'bg-slate-205 dark:bg-slate-700 text-slate-750 dark:text-slate-300 font-extrabold'
-                    : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
-                }`}>
-                  {tasksByStatus.todo.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setTaskBoardTab('doing')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  taskBoardTab === 'doing'
-                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border-b-2 border-blue-500'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                <span>{t('In Progress', 'Yapılıyor', 'W toku')}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                  taskBoardTab === 'doing'
-                    ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 font-extrabold'
-                    : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
-                }`}>
-                  {tasksByStatus.doing.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setTaskBoardTab('done')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  taskBoardTab === 'done'
-                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border-b-2 border-emerald-500'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>{t('Completed', 'Bitenler', 'Ukończone')}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                  taskBoardTab === 'done'
-                    ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-extrabold'
-                    : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
-                }`}>
-                  {tasksByStatus.done.length}
-                </span>
-              </button>
-            </div>
-
-            {/* Tasks Kanban Columns */}
-            <div className={`grid gap-5 font-sans ${
-              taskBoardTab === 'all' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'
-            }`}>
-              
-              {/* YAPILACAKLAR COLUMN */}
-              {(taskBoardTab === 'all' || taskBoardTab === 'todo') && (
-                <div className="bg-slate-50/40 p-4 rounded-2xl border border-slate-100/60 flex flex-col min-h-[400px]">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-slate-400" />
-                      {t('TO DO', 'YAPILACAKLAR', 'DO ZROBIENIA')}
-                    </h4>
-                    <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-500">
+                  <button
+                    type="button"
+                    onClick={() => setTaskBoardTab('todo')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      taskBoardTab === 'todo'
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border-b-2 border-slate-450 dark:border-slate-500'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-slate-400" />
+                    <span>{t('To Do', 'Yapılacaklar', 'Do zrobienia')}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                      taskBoardTab === 'todo'
+                        ? 'bg-slate-205 dark:bg-slate-700 text-slate-750 dark:text-slate-300 font-extrabold'
+                        : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
+                    }`}>
                       {tasksByStatus.todo.length}
                     </span>
-                  </div>
+                  </button>
 
-                  <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
-                    {tasksByStatus.todo.length === 0 ? (
-                      <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                        {t('No registered tasks.', 'Kayıtlı görev yok.', 'Brak zarejestrowanych zadań.')}
-                      </div>
-                    ) : (
-                      tasksByStatus.todo.map((tk) => (
-                        <TaskCard 
-                          key={tk.id} 
-                          task={tk} 
-                          onEdit={handleOpenEditTask}
-                          onDelete={handleTriggerDeleteTask}
-                          onShiftStatus={(x) => handleStatusShift(x, 'doing')}
-                          badgeClass={getPriorityBadgeClass}
-                          priorityLabel={getPriorityLabel}
-                          nextStatusLabel={t('Start Work', 'Çalışmayı Başlat', 'Rozpocznij pracę')}
-                          lang={activeSettings.lang}
-                          settings={activeSettings}
-                        />
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* YAPILIYOR COLUMN */}
-              {(taskBoardTab === 'all' || taskBoardTab === 'doing') && (
-                <div className="bg-blue-50/20 p-4 rounded-2xl border border-blue-50/35 flex flex-col min-h-[400px]">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-bold text-blue-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                      {t('IN PROGRESS', 'YAPILIYOR', 'W TOKU')}
-                    </h4>
-                    <span className="bg-blue-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-blue-700">
+                  <button
+                    type="button"
+                    onClick={() => setTaskBoardTab('doing')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      taskBoardTab === 'doing'
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border-b-2 border-blue-500'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                    <span>{t('In Progress', 'Yapılıyor', 'W toku')}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                      taskBoardTab === 'doing'
+                        ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 font-extrabold'
+                        : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
+                    }`}>
                       {tasksByStatus.doing.length}
                     </span>
-                  </div>
+                  </button>
 
-                  <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
-                    {tasksByStatus.doing.length === 0 ? (
-                      <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                        {t('No tasks in progress.', 'Çalışılan görev yok.', 'Brak zadań w toku.')}
-                      </div>
-                    ) : (
-                      tasksByStatus.doing.map((tk) => (
-                        <TaskCard 
-                          key={tk.id} 
-                          task={tk} 
-                          onEdit={handleOpenEditTask}
-                          onDelete={handleTriggerDeleteTask}
-                          onShiftStatus={(x) => handleStatusShift(x, 'done')}
-                          badgeClass={getPriorityBadgeClass}
-                          priorityLabel={getPriorityLabel}
-                          nextStatusLabel={t('Mark as Completed', 'Tamamlandı Olarak İşaretle', 'Oznacz jako ukończone')}
-                          lang={activeSettings.lang}
-                          settings={activeSettings}
-                        />
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* BİTENLER COLUMN */}
-              {(taskBoardTab === 'all' || taskBoardTab === 'done') && (
-                <div className="bg-emerald-50/10 p-4 rounded-2xl border border-emerald-50/20 flex flex-col min-h-[400px]">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-bold text-emerald-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      {t('COMPLETED', 'BİTENLER', 'UKOŃCZONE')}
-                    </h4>
-                    <span className="bg-emerald-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-emerald-700">
+                  <button
+                    type="button"
+                    onClick={() => setTaskBoardTab('done')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      taskBoardTab === 'done'
+                        ? 'bg-white dark:bg-slate-800 text-slate-905 dark:text-white shadow-sm border-b-2 border-emerald-500'
+                        : 'text-slate-505 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/10'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>{t('Completed', 'Bitenler', 'Ukończone')}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                      taskBoardTab === 'done'
+                        ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-extrabold'
+                        : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
+                    }`}>
                       {tasksByStatus.done.length}
                     </span>
-                  </div>
-
-                  <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
-                    {tasksByStatus.done.length === 0 ? (
-                      <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                        {t('No completed tasks.', 'Tamamlanan görev yok.', 'Brak ukończonych zadań.')}
-                      </div>
-                    ) : (
-                      tasksByStatus.done.map((tk) => (
-                        <TaskCard 
-                          key={tk.id} 
-                          task={tk} 
-                          onEdit={handleOpenEditTask}
-                          onDelete={handleTriggerDeleteTask}
-                          badgeClass={getPriorityBadgeClass}
-                          priorityLabel={getPriorityLabel}
-                          isCompleted
-                          onShiftStatusBack={(x) => handleStatusShift(x, 'doing')}
-                          lang={activeSettings.lang}
-                          settings={activeSettings}
-                        />
-                      ))
-                    )}
-                  </div>
+                  </button>
                 </div>
-              )}
 
-            </div>
+                {/* Tasks Kanban Columns */}
+                <div className={`grid gap-5 font-sans ${
+                  taskBoardTab === 'all' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'
+                }`}>
+                  
+                  {/* YAPILACAKLAR COLUMN */}
+                  {(taskBoardTab === 'all' || taskBoardTab === 'todo') && (
+                    <div className="bg-slate-50/40 p-4 rounded-2xl border border-slate-100/60 flex flex-col min-h-[400px]">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-slate-400" />
+                          {t('TO DO', 'YAPILACAKLAR', 'DO ZROBIENIA')}
+                        </h4>
+                        <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-500">
+                          {tasksByStatus.todo.length}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
+                        {tasksByStatus.todo.length === 0 ? (
+                          <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
+                            {t('No registered tasks.', 'Kayıtlı görev yok.', 'Brak zarejestrowanych zadań.')}
+                          </div>
+                        ) : (
+                          tasksByStatus.todo.map((tk) => (
+                            <TaskCard 
+                              key={tk.id} 
+                              task={tk} 
+                              onEdit={handleOpenEditTask}
+                              onDelete={handleTriggerDeleteTask}
+                              onShiftStatus={(activeProjectPermissions.tasks === 'full' || activeProjectPermissions.tasks === 'edit') ? ((x) => handleStatusShift(x, 'doing')) : undefined}
+                              badgeClass={getPriorityBadgeClass}
+                              priorityLabel={getPriorityLabel}
+                              nextStatusLabel={t('Start Work', 'Çalışmayı Başlat', 'Rozpocznij pracę')}
+                              lang={activeSettings.lang}
+                              settings={activeSettings}
+                              canEdit={activeProjectPermissions.tasks === 'full' || activeProjectPermissions.tasks === 'edit'}
+                              canDelete={activeProjectPermissions.tasks === 'full'}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* YAPILIYOR COLUMN */}
+                  {(taskBoardTab === 'all' || taskBoardTab === 'doing') && (
+                    <div className="bg-blue-50/20 p-4 rounded-2xl border border-blue-50/35 flex flex-col min-h-[400px]">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-bold text-blue-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                          {t('IN PROGRESS', 'YAPILIYOR', 'W TOKU')}
+                        </h4>
+                        <span className="bg-blue-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-blue-700">
+                          {tasksByStatus.doing.length}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
+                        {tasksByStatus.doing.length === 0 ? (
+                          <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
+                            {t('No tasks in progress.', 'Çalışılan görev yok.', 'Brak zadań w toku.')}
+                          </div>
+                        ) : (
+                          tasksByStatus.doing.map((tk) => (
+                            <TaskCard 
+                              key={tk.id} 
+                              task={tk} 
+                              onEdit={handleOpenEditTask}
+                              onDelete={handleTriggerDeleteTask}
+                              onShiftStatus={(activeProjectPermissions.tasks === 'full' || activeProjectPermissions.tasks === 'edit') ? ((x) => handleStatusShift(x, 'done')) : undefined}
+                              badgeClass={getPriorityBadgeClass}
+                              priorityLabel={getPriorityLabel}
+                              nextStatusLabel={t('Mark as Completed', 'Tamamlandı Olarak İşaretle', 'Oznacz jako ukończone')}
+                              lang={activeSettings.lang}
+                              settings={activeSettings}
+                              canEdit={activeProjectPermissions.tasks === 'full' || activeProjectPermissions.tasks === 'edit'}
+                              canDelete={activeProjectPermissions.tasks === 'full'}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* BİTENLER COLUMN */}
+                  {(taskBoardTab === 'all' || taskBoardTab === 'done') && (
+                    <div className="bg-emerald-50/10 p-4 rounded-2xl border border-emerald-50/20 flex flex-col min-h-[400px]">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-bold text-emerald-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          {t('COMPLETED', 'BİTENLER', 'UKOŃCZONE')}
+                        </h4>
+                        <span className="bg-emerald-50 px-2 py-0.5 rounded-full text-[11px] font-bold text-emerald-700">
+                          {tasksByStatus.done.length}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3 flex-grow overflow-y-auto max-h-[500px]">
+                        {tasksByStatus.done.length === 0 ? (
+                          <div className="py-8 text-center text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
+                            {t('No completed tasks.', 'Tamamlanan görev yok.', 'Brak ukończonych zadań.')}
+                          </div>
+                        ) : (
+                          tasksByStatus.done.map((tk) => (
+                            <TaskCard 
+                              key={tk.id} 
+                              task={tk} 
+                              onEdit={handleOpenEditTask}
+                              onDelete={handleTriggerDeleteTask}
+                              badgeClass={getPriorityBadgeClass}
+                              priorityLabel={getPriorityLabel}
+                              isCompleted
+                              onShiftStatusBack={(activeProjectPermissions.tasks === 'full' || activeProjectPermissions.tasks === 'edit') ? ((x) => handleStatusShift(x, 'doing')) : undefined}
+                              lang={activeSettings.lang}
+                              settings={activeSettings}
+                              canEdit={activeProjectPermissions.tasks === 'full' || activeProjectPermissions.tasks === 'edit'}
+                              canDelete={activeProjectPermissions.tasks === 'full'}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-250 text-center text-slate-400 space-y-4 font-sans">
@@ -1224,7 +1284,7 @@ export default function ProjectsView({
                     }
                     setDeleteConfirmInfo(null);
                   }}
-                  className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700 shadow-xs transition-colors cursor-pointer"
+                  className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-red-650 hover:bg-red-700 shadow-xs transition-colors cursor-pointer"
                 >
                   {t('Yes, Delete', 'Evet, Sil', 'Tak, usuń')}
                 </button>
@@ -1251,6 +1311,8 @@ interface TaskCardProps {
   nextStatusLabel?: string;
   lang?: 'tr' | 'en' | 'pl';
   settings?: AppSettings;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 function TaskCard({
@@ -1264,7 +1326,9 @@ function TaskCard({
   isCompleted = false,
   nextStatusLabel,
   lang = 'en',
-  settings
+  settings,
+  canEdit = true,
+  canDelete = true
 }: TaskCardProps) {
   const t = (enStr: string, trStr: string, plStr: string) => {
     const currentLang = settings?.lang || lang;
@@ -1283,22 +1347,26 @@ function TaskCard({
             {priorityLabel(task.priority)}
           </span>
           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
-            <button 
-              id={`task-card-edit-btn-${task.id}`}
-              onClick={() => onEdit(task)}
-              className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-amber-600 transition-colors cursor-pointer"
-              title={t('Edit Task', 'Görevi Düzenle', 'Edytuj zadanie')}
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-            </button>
-             <button 
-              id={`task-card-delete-btn-${task.id}`}
-              onClick={() => onDelete(task.id)}
-              className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-650 transition-colors cursor-pointer"
-              title={t('Delete Task', 'Görevi Sil', 'Usuń zadanie')}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            {canEdit && (
+              <button 
+                id={`task-card-edit-btn-${task.id}`}
+                onClick={() => onEdit(task)}
+                className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-amber-600 transition-colors cursor-pointer"
+                title={t('Edit Task', 'Görevi Düzenle', 'Edytuj zadanie')}
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {canDelete && (
+              <button 
+                id={`task-card-delete-btn-${task.id}`}
+                onClick={() => onDelete(task.id)}
+                className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-655 transition-colors cursor-pointer"
+                title={t('Delete Task', 'Görevi Sil', 'Usuń zadanie')}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1324,7 +1392,7 @@ function TaskCard({
 
       {/* Manual Status shifts button helper for seamless tracking */}
       <div className="flex gap-1.5 pt-1">
-        {onShiftStatusBack && (
+        {onShiftStatusBack && canEdit && (
           <button 
             id={`task-card-shift-back-${task.id}`}
             onClick={() => onShiftStatusBack(task)}
@@ -1333,7 +1401,7 @@ function TaskCard({
             ← {t('Go Back', 'Geri Al', 'Cofnij')}
           </button>
         )}
-        {onShiftStatus && (
+        {onShiftStatus && canEdit && (
           <button
             id={`task-card-shift-${task.id}`}
             onClick={() => onShiftStatus(task)}

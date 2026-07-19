@@ -1004,6 +1004,8 @@ export default function App() {
                   initialSelectedProjectId={deepSelectProjectId}
                   settings={settings}
                   customers={customers}
+                  collaborations={collaborations}
+                  userEmail={user.email || ''}
                 />
               )}
 
@@ -1028,6 +1030,8 @@ export default function App() {
                   onUpdateMaterial={handleUpdateMaterial}
                   onDeleteMaterial={handleDeleteMaterial}
                   settings={settings}
+                  collaborations={collaborations}
+                  userEmail={user.email || ''}
                 />
               )}
 
@@ -1041,6 +1045,8 @@ export default function App() {
                   onImportBackup={handleImportBackup}
                   allDataExportString={allDataExportString}
                   settings={settings}
+                  collaborations={collaborations}
+                  userEmail={user.email || ''}
                 />
               )}
 

@@ -14,13 +14,16 @@ import {
   HelpCircle,
   Briefcase,
   ChevronRight,
+  ChevronDown,
+  EyeOff,
+  Settings as SettingsIcon,
   Sparkles,
   Info
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { Project, Collaborator, AppSettings } from '../types';
-import { formatDate } from '../utils';
+import { Project, Collaborator, AppSettings, CollaboratorPermissions, PermissionLevel } from '../types';
+import { formatDate, getCollaboratorPermissions } from '../utils';
 
 interface CollaborationViewProps {
   userUid: string;
@@ -40,12 +43,63 @@ export default function CollaborationView({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [collabEmail, setCollabEmail] = useState('');
-  const [collabRole, setCollabRole] = useState<'admin' | 'editor' | 'viewer'>('editor');
+  const [collabRole, setCollabRole] = useState<'admin' | 'editor' | 'viewer' | 'custom'>('editor');
+  const [editingCollabId, setEditingCollabId] = useState<string | null>(null);
+
+  // Advanced section permissions
+  const [permProjectDetails, setPermProjectDetails] = useState<PermissionLevel>('view');
+  const [permTasks, setPermTasks] = useState<PermissionLevel>('edit');
+  const [permBudget, setPermBudget] = useState<PermissionLevel>('edit');
+  const [permAccounting, setPermAccounting] = useState<PermissionLevel>('view');
+
+  // Collapsible headers state
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    projectDetails: true,
+    tasks: false,
+    budget: false,
+    accounting: false
+  });
 
   const t = (en: string, tr: string, pl: string) => {
     if (settings.lang === 'tr') return tr;
     if (settings.lang === 'pl') return pl;
     return en;
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Sync role selection with predefined permission matrices
+  const selectRoleAndFillPermissions = (role: 'admin' | 'editor' | 'viewer' | 'custom') => {
+    setCollabRole(role);
+    if (role === 'admin') {
+      setPermProjectDetails('full');
+      setPermTasks('full');
+      setPermBudget('full');
+      setPermAccounting('full');
+    } else if (role === 'editor') {
+      setPermProjectDetails('view');
+      setPermTasks('edit');
+      setPermBudget('edit');
+      setPermAccounting('view');
+    } else if (role === 'viewer') {
+      setPermProjectDetails('view');
+      setPermTasks('view');
+      setPermBudget('view');
+      setPermAccounting('view');
+    }
+  };
+
+  const handlePermissionChange = (field: keyof CollaboratorPermissions, value: PermissionLevel) => {
+    setCollabRole('custom');
+    if (field === 'projectDetails') setPermProjectDetails(value);
+    if (field === 'tasks') setPermTasks(value);
+    if (field === 'budget') setPermBudget(value);
+    if (field === 'accounting') setPermAccounting(value);
   };
 
   // Divide collaborations into:
@@ -61,18 +115,43 @@ export default function CollaborationView({
 
   // Only allow sharing projects that the user owns (not projects shared with them)
   const myProjects = useMemo(() => {
-    // If a project is in the projects list and its owner is the user (which is true for projects list since standard list fetched are user owned by default, but double check)
-    // Wait, let's list projects that the user owns. Projects in the list are either owned or shared. We can check if a project was shared with us.
     const sharedProjectIds = new Set(sharesWithMe.map(s => s.projectId));
     return projects.filter(p => !sharedProjectIds.has(p.id));
   }, [projects, sharesWithMe]);
 
-  const handleAddCollaborator = async (e: React.FormEvent) => {
+  const handleOpenAddModal = () => {
+    setEditingCollabId(null);
+    if (myProjects.length > 0) {
+      setSelectedProjectId(myProjects[0].id);
+    } else {
+      setSelectedProjectId('');
+    }
+    setCollabEmail('');
+    selectRoleAndFillPermissions('editor');
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (share: Collaborator) => {
+    setEditingCollabId(share.id);
+    setSelectedProjectId(share.projectId);
+    setCollabEmail(share.userEmail);
+    setCollabRole(share.role);
+
+    const perms = getCollaboratorPermissions(share, false);
+    setPermProjectDetails(perms.projectDetails);
+    setPermTasks(perms.tasks);
+    setPermBudget(perms.budget);
+    setPermAccounting(perms.accounting);
+
+    setIsModalOpen(true);
+  };
+
+  const handleSaveCollaborator = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProjectId || !collabEmail.trim()) return;
 
     const emailClean = collabEmail.trim().toLowerCase();
-    if (emailClean === userEmail.toLowerCase()) {
+    if (emailClean === userEmail.toLowerCase() && !editingCollabId) {
       alert(t('You cannot share a project with yourself!', 'Bir projeyi kendinizle paylaşamazsınız!', 'Nie możesz udostępnić projektu samemu sobie!'));
       return;
     }
@@ -82,7 +161,7 @@ export default function CollaborationView({
       const projName = selectedProj ? selectedProj.name : '';
       
       // Document ID is "projectId_userEmail"
-      const collaboratorId = `${selectedProjectId}_${emailClean}`;
+      const collaboratorId = editingCollabId || `${selectedProjectId}_${emailClean}`;
       const collaboratorData: Collaborator = {
         id: collaboratorId,
         projectId: selectedProjectId,
@@ -90,15 +169,22 @@ export default function CollaborationView({
         ownerId: userUid,
         userEmail: emailClean,
         role: collabRole,
-        createdAt: new Date().toISOString()
+        createdAt: editingCollabId ? (collaborations.find(c => c.id === editingCollabId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
+        permissions: {
+          projectDetails: permProjectDetails,
+          tasks: permTasks,
+          budget: permBudget,
+          accounting: permAccounting
+        }
       };
 
       await setDoc(doc(db, 'collaborators', collaboratorId), collaboratorData);
       
       // Reset
       setIsModalOpen(false);
+      setEditingCollabId(null);
       setCollabEmail('');
-      setCollabRole('editor');
+      selectRoleAndFillPermissions('editor');
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'add_collaborator');
     }
@@ -131,10 +217,7 @@ export default function CollaborationView({
 
         {myProjects.length > 0 && (
           <button
-            onClick={() => {
-              setSelectedProjectId(myProjects[0].id);
-              setIsModalOpen(true);
-            }}
+            onClick={handleOpenAddModal}
             className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-2xs hover:shadow-sm cursor-pointer text-sm"
           >
             <Plus className="w-5 h-5" />
@@ -214,14 +297,22 @@ export default function CollaborationView({
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <span className={`px-2 py-0.5 rounded-sm font-bold uppercase text-[9px] ${
                       share.role === 'admin' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
                       share.role === 'editor' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                      share.role === 'custom' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' :
                       'bg-blue-50 text-blue-600 border border-blue-100'
                     }`}>
-                      {share.role}
+                      {share.role === 'custom' ? t('Custom', 'Özel Yetki', 'Własne') : share.role}
                     </span>
+                    <button
+                      onClick={() => handleOpenEditModal(share)}
+                      className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                      title={t('Edit Permissions', 'Yetkileri Düzenle', 'Edytuj Uprawnienia')}
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => handleRevokeShare(share.id)}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
@@ -273,9 +364,10 @@ export default function CollaborationView({
                   <span className={`px-2 py-0.5 rounded-sm font-bold uppercase text-[9px] ${
                     share.role === 'admin' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
                     share.role === 'editor' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                    share.role === 'custom' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' :
                     'bg-blue-50 text-blue-600 border border-blue-100'
                   }`}>
-                    {share.role}
+                    {share.role === 'custom' ? t('Custom', 'Özel Yetki', 'Własne') : share.role}
                   </span>
                 </div>
               ))
@@ -290,10 +382,13 @@ export default function CollaborationView({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs" onClick={() => setIsModalOpen(false)} />
           
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-sm w-full relative z-10">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-lg w-full relative z-10 flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-md font-bold text-slate-900">
-                {t('Authorize Access to Project', 'Projeye Yetkilendir', 'Upoważnij do Projektu')}
+                {editingCollabId 
+                  ? t('Edit Collaborator Permissions', 'Ortak Yetkilerini Düzenle', 'Edytuj Uprawnienia Współpracownika')
+                  : t('Authorize Access to Project', 'Yeni İş Ortağı Yetkilendir', 'Upoważnij do Projektu')
+                }
               </h3>
               <button 
                 onClick={() => setIsModalOpen(false)}
@@ -303,7 +398,7 @@ export default function CollaborationView({
               </button>
             </div>
 
-            <form onSubmit={handleAddCollaborator} className="p-6 space-y-4">
+            <form onSubmit={handleSaveCollaborator} className="p-6 space-y-4 overflow-y-auto flex-1">
               
               {/* Select Project */}
               <div className="space-y-1">
@@ -312,13 +407,19 @@ export default function CollaborationView({
                 </label>
                 <select
                   required
+                  disabled={!!editingCollabId}
                   value={selectedProjectId}
                   onChange={e => setSelectedProjectId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-1 focus:ring-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   {myProjects.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
+                  {editingCollabId && (
+                    <option value={selectedProjectId}>
+                      {collaborations.find(c => c.id === editingCollabId)?.projectName || selectedProjectId}
+                    </option>
+                  )}
                 </select>
               </div>
 
@@ -330,14 +431,17 @@ export default function CollaborationView({
                 <input
                   type="email"
                   required
+                  disabled={!!editingCollabId}
                   value={collabEmail}
                   onChange={e => setCollabEmail(e.target.value)}
                   placeholder="e.g. usta@gmail.com"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-1 focus:ring-amber-500 disabled:bg-slate-50 disabled:text-slate-500"
                 />
-                <span className="text-[10px] text-slate-400 block pt-0.5">
-                  {t('The user must log in using this email address to see this project.', 'Kullanıcı bu projeyi görebilmek için bu e-posta adresi ile giriş yapmalıdır.', 'Współpracownik musi zalogować się tym e-mailem, aby zobaczyć projekt.')}
-                </span>
+                {!editingCollabId && (
+                  <span className="text-[10px] text-slate-400 block pt-0.5">
+                    {t('The user must log in using this email address to see this project.', 'Kullanıcı bu projeyi görebilmek için bu e-posta adresi ile giriş yapmalıdır.', 'Współpracownik musi zalogować się tym e-mailem, aby zobaczyć projekt.')}
+                  </span>
+                )}
               </div>
 
               {/* Collaborator Role */}
@@ -345,37 +449,144 @@ export default function CollaborationView({
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                   {t('Access Role *', 'Erişim Yetki Derecesi *', 'Poziom Uprawnień *')}
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['viewer', 'editor', 'admin'] as const).map(role => (
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(['viewer', 'editor', 'admin', 'custom'] as const).map(role => (
                     <button
                       key={role}
                       type="button"
-                      onClick={() => setCollabRole(role)}
-                      className={`py-2 text-xs font-bold rounded-lg border uppercase transition-all cursor-pointer ${
+                      onClick={() => selectRoleAndFillPermissions(role)}
+                      className={`py-2 px-1 text-[10px] font-bold rounded-lg border uppercase transition-all cursor-pointer truncate ${
                         collabRole === role 
                           ? 'bg-amber-500/10 text-amber-600 border-amber-500' 
                           : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      {role}
+                      {role === 'custom' ? t('Custom', 'Özel', 'Własne') : role}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex gap-3">
+              {/* Customizable Permissions Accordion List */}
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  {t('Detailed Section Permissions', 'Bölüm Yetki Detayları', 'Szczegółowe Uprawnienia Sekcji')}
+                </label>
+                
+                {[
+                  {
+                    key: 'projectDetails' as const,
+                    title: t('Project Details & Core Info', 'Proje Bilgileri & Detaylar', 'Szczegóły Projektu'),
+                    desc: t('Name, dates, descriptions, settings & project status', 'Proje adı, bütçesi, tarihleri ve gidişatı', 'Nazwa projektu, budżet, daty, status'),
+                    state: permProjectDetails
+                  },
+                  {
+                    key: 'tasks' as const,
+                    title: t('Tasks & Milestones', 'Şantiye İşleri & Günlük Rapor', 'Zadania i etapy'),
+                    desc: t('Adding, editing and deleting renovation tasks', 'Yapılacak işler listesi ve günlük iş takipleri', 'Zadania remontowe, postęp i statusy'),
+                    state: permTasks
+                  },
+                  {
+                    key: 'budget' as const,
+                    title: t('Materials & Budget', 'Malzemeler & Sipariş Listeleri', 'Materiały i budżet'),
+                    desc: t('Unit prices, material costs and planning', 'Malzeme listeleri, birim fiyatlar ve satın alma', 'Lista materiałów, planowanie, koszty'),
+                    state: permBudget
+                  },
+                  {
+                    key: 'accounting' as const,
+                    title: t('Accounting & Financial Ledger', 'Muhasebe Defteri & Kasalar', 'Księga Rachunkowa'),
+                    desc: t('Ledger records, cash registry, payments & income', 'Para giriş çıkışları, kasa defteri ve ödemeler', 'Transakcje finansowe, płatności, dochody'),
+                    state: permAccounting
+                  }
+                ].map(sec => {
+                  const isExpanded = expandedSections[sec.key];
+                  
+                  const getLevelLabel = (level: PermissionLevel) => {
+                    switch (level) {
+                      case 'full': return t('Full Access', 'Tam Yetki', 'Pełny');
+                      case 'edit': return t('Edit', 'Düzenleme', 'Edycja');
+                      case 'view': return t('View Only', 'Görüntüleme', 'Podgląd');
+                      case 'hide': return t('Hidden', 'Gizle', 'Ukryte');
+                    }
+                  };
+
+                  const getLevelColor = (level: PermissionLevel) => {
+                    switch (level) {
+                      case 'full': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+                      case 'edit': return 'text-indigo-600 bg-indigo-50 border-indigo-100';
+                      case 'view': return 'text-blue-600 bg-blue-50 border-blue-100';
+                      case 'hide': return 'text-slate-500 bg-slate-50 border-slate-100';
+                    }
+                  };
+
+                  return (
+                    <div key={sec.key} className="border border-slate-250/70 rounded-xl overflow-hidden bg-white shadow-2xs">
+                      {/* Header */}
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(sec.key)}
+                        className="w-full flex items-center justify-between p-3 text-left hover:bg-slate-50/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 pr-2">
+                          {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                          <div className="min-w-0">
+                            <p className="font-bold text-xs text-slate-800">{sec.title}</p>
+                            <p className="text-[10px] text-slate-400 font-normal truncate">{sec.desc}</p>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-sm font-bold uppercase text-[8px] border flex-shrink-0 ${getLevelColor(sec.state)}`}>
+                          {getLevelLabel(sec.state)}
+                        </span>
+                      </button>
+
+                      {/* Body */}
+                      {isExpanded && (
+                        <div className="p-3 bg-slate-50/80 border-t border-slate-100 grid grid-cols-2 gap-2">
+                          {(['full', 'edit', 'view', 'hide'] as const).map(level => {
+                            const isSelected = sec.state === level;
+                            return (
+                              <button
+                                key={level}
+                                type="button"
+                                onClick={() => handlePermissionChange(sec.key, level)}
+                                className={`p-2 rounded-lg border text-left text-[11px] transition-all flex flex-col justify-between h-14 ${
+                                  isSelected 
+                                    ? 'bg-white border-amber-500 shadow-2xs ring-2 ring-amber-500/10 text-slate-900 font-medium' 
+                                    : 'bg-white border-slate-200 hover:bg-white text-slate-500'
+                                }`}
+                              >
+                                <span className={`font-bold block text-xs ${isSelected ? 'text-amber-600' : 'text-slate-700'}`}>
+                                  {getLevelLabel(level)}
+                                </span>
+                                <span className="text-[9px] text-slate-400 block truncate leading-tight w-full">
+                                  {level === 'full' && t('View, edit & delete', 'Görüntüle, düzenle, sil', 'Podgląd, edycja i usuwanie')}
+                                  {level === 'edit' && t('View & edit (no delete)', 'Görüntüle ve düzenle', 'Podgląd i edycja')}
+                                  {level === 'view' && t('View only (read-only)', 'Sadece görüntüle', 'Tylko podgląd')}
+                                  {level === 'hide' && t('Cannot view or access', 'Girişi tamamen gizle', 'Całkowicie ukryj')}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex gap-3 sticky bottom-0 bg-white">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
                 >
                   {t('Cancel', 'Vazgeç', 'Anuluj')}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+                  className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
                 >
-                  {t('Save', 'Yetkilendir', 'Upoważnij')}
+                  {editingCollabId ? t('Update', 'Güncelle', 'Aktualizuj') : t('Authorize', 'Yetkilendir', 'Upoważnij')}
                 </button>
               </div>
 

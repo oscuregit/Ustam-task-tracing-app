@@ -1,4 +1,4 @@
-import { AppSettings } from './types';
+import { AppSettings, Collaborator, CollaboratorPermissions } from './types';
 
 export function getCurrencySymbol(currency: 'TRY' | 'USD' | 'EUR' | 'PLN'): string {
   switch (currency) {
@@ -202,6 +202,61 @@ export function translateCategory(cat: string, lang: 'tr' | 'en' | 'pl'): string
   };
   
   return dict[cat] ? dict[cat][lang] : cat;
+}
+
+/**
+ * Returns the resolved permissions of a user on a given project.
+ */
+export function getCollaboratorPermissions(
+  collab: Collaborator | undefined,
+  isOwner: boolean
+): CollaboratorPermissions {
+  if (isOwner) {
+    return {
+      projectDetails: 'full',
+      tasks: 'full',
+      budget: 'full',
+      accounting: 'full'
+    };
+  }
+  if (!collab) {
+    return {
+      projectDetails: 'hide',
+      tasks: 'hide',
+      budget: 'hide',
+      accounting: 'hide'
+    };
+  }
+
+  // If custom permissions exist, use them
+  if (collab.permissions) {
+    return collab.permissions;
+  }
+
+  // Fallback to role defaults
+  if (collab.role === 'admin') {
+    return {
+      projectDetails: 'full',
+      tasks: 'full',
+      budget: 'full',
+      accounting: 'full'
+    };
+  } else if (collab.role === 'editor') {
+    return {
+      projectDetails: 'view',
+      tasks: 'edit',
+      budget: 'edit',
+      accounting: 'view'
+    };
+  } else {
+    // viewer
+    return {
+      projectDetails: 'view',
+      tasks: 'view',
+      budget: 'view',
+      accounting: 'view'
+    };
+  }
 }
 
 
