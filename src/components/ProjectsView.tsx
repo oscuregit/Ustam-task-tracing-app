@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Project, ProjectStatus, Task, TaskPriority, TaskStatus, AppSettings, Transaction, Customer, Collaborator, PermissionLevel } from '../types';
+import { Project, ProjectStatus, Task, TaskPriority, TaskStatus, AppSettings, Transaction, Customer, Collaborator, PermissionLevel, Material } from '../types';
 import { formatMoney, formatDate, toDbDate, getCollaboratorPermissions } from '../utils';
 import { 
   Building2, 
@@ -16,13 +16,15 @@ import {
   Check,
   Briefcase,
   X,
-  EyeOff
+  EyeOff,
+  ShoppingBag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ProjectsViewProps {
   projects: Project[];
   tasks: Task[];
+  materials?: Material[];
   onAddProject: (p: Omit<Project, 'id'>) => void;
   onUpdateProject: (p: Project) => void;
   onDeleteProject: (projectId: string) => void;
@@ -40,6 +42,7 @@ interface ProjectsViewProps {
 export default function ProjectsView({
   projects,
   tasks,
+  materials = [],
   onAddProject,
   onUpdateProject,
   onDeleteProject,
@@ -117,6 +120,21 @@ export default function ProjectsView({
     const collab = (collaborations || []).find(c => c.projectId === activeProject.id && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
     return getCollaboratorPermissions(collab, !collab);
   }, [activeProject, collaborations, userEmail]);
+
+  // Project Materials and Cost Aggregations
+  const activeProjectMaterials = useMemo(() => {
+    if (!activeProject) return [];
+    return materials.filter(m => m.projectId === activeProject.id);
+  }, [materials, activeProject]);
+
+  const activeProjectMaterialCost = useMemo(() => {
+    return activeProjectMaterials.reduce((sum, m) => sum + (m.totalPrice || (m.quantity * m.unitPrice) || 0), 0);
+  }, [activeProjectMaterials]);
+
+  const activeProjectLaborOrRemaining = useMemo(() => {
+    if (!activeProject) return 0;
+    return Math.max(0, activeProject.allocatedBudget - activeProjectMaterialCost);
+  }, [activeProject, activeProjectMaterialCost]);
 
   // Project Filtering
   const [projectStatusFilter, setProjectStatusFilter] = useState<string>('all');
@@ -431,15 +449,25 @@ export default function ProjectsView({
                       }`} />
                     </div>
 
-                    <div className="flex justify-between items-center text-[10px] text-slate-500">
+                    <div className="flex justify-between items-start text-[10px] text-slate-500 pt-0.5">
                       {(() => {
                         const collab = (collaborations || []).find(c => c.projectId === p.id && c.userEmail.toLowerCase().trim() === (userEmail || '').toLowerCase().trim());
                         const perms = getCollaboratorPermissions(collab, !collab);
                         const hideBudget = perms.budget === 'hide';
+                        const pMaterials = materials.filter(m => m.projectId === p.id);
+                        const pMatCost = pMaterials.reduce((sum, m) => sum + (m.totalPrice || (m.quantity * m.unitPrice) || 0), 0);
                         return (
-                          <span className="font-medium bg-slate-100 px-1.5 py-0.5 rounded-md text-slate-655 dark:bg-slate-800 dark:text-slate-350">
-                            {hideBudget ? '****' : formatMoney(p.allocatedBudget, activeSettings)}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-bold bg-slate-100 px-1.5 py-0.5 rounded-md text-slate-700 dark:bg-slate-800 dark:text-slate-350">
+                              {hideBudget ? '****' : formatMoney(p.allocatedBudget, activeSettings)}
+                            </span>
+                            {pMatCost > 0 && !hideBudget && (
+                              <span className="text-[9px] text-amber-600 dark:text-amber-400 flex items-center gap-1 font-semibold">
+                                <ShoppingBag className="w-2.5 h-2.5 flex-shrink-0" />
+                                <span>{t('Materials: ', 'Malzeme: ', 'Materiały: ')}{formatMoney(pMatCost, activeSettings)}</span>
+                              </span>
+                            )}
+                          </div>
                         );
                       })()}
                       <span className={`px-1.5 py-0.5 rounded bg-slate-50 border ${
@@ -535,36 +563,84 @@ export default function ProjectsView({
               </p>
 
               {/* Dates & Budgets Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 text-xs">
-                <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Allocated Budget', 'Ayrılan Bütçe', 'Przydzielony budżet')}</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-200 text-sm font-mono">
-                    {activeProjectPermissions.budget === 'hide' ? '****' : formatMoney(activeProject.allocatedBudget, activeSettings)}
-                  </span>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 text-xs">
+                {/* 1. Total Allocated Budget */}
+                <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">
+                      {t('Allocated Budget', 'Toplam Ayrılan Bütçe', 'Przydzielony budżet')}
+                    </span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100 text-sm font-mono block">
+                      {activeProjectPermissions.budget === 'hide' ? '****' : formatMoney(activeProject.allocatedBudget, activeSettings)}
+                    </span>
+                  </div>
+                  {activeProjectPermissions.budget !== 'hide' && activeProjectMaterialCost > 0 && (
+                    <div className="text-[9px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/50 dark:border-slate-700/50 mt-1 flex items-center justify-between">
+                      <span>{t('Labor / Rest:', 'İşçilik/Diğer:', 'Robocizna/Inne:')}</span>
+                      <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                        {formatMoney(activeProjectLaborOrRemaining, activeSettings)}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Planned Start', 'Planlanan Başlama', 'Planowany start')}</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" /> {formatDate(activeProject.startDate, activeSettings)}
-                  </span>
+
+                {/* 2. Total Material Costs */}
+                <div className="bg-amber-50/60 dark:bg-amber-950/20 p-2.5 rounded-xl border border-amber-200/60 dark:border-amber-900/40 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-amber-700 dark:text-amber-400 font-semibold uppercase tracking-wider text-[9px]">
+                        {t('Material Costs', 'Toplam Malzeme Tutarı', 'Koszty materiałów')}
+                      </span>
+                      <ShoppingBag className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                    </div>
+                    <span className="font-bold text-amber-600 dark:text-amber-400 text-sm font-mono block">
+                      {activeProjectPermissions.budget === 'hide' ? '****' : formatMoney(activeProjectMaterialCost, activeSettings)}
+                    </span>
+                  </div>
+                  <div className="text-[9px] text-amber-700/80 dark:text-amber-400/80 pt-1 border-t border-amber-200/50 dark:border-amber-800/40 mt-1 flex items-center justify-between">
+                    <span>{activeProjectMaterials.length} {t('Items in budget', 'Kalem Malzeme', 'Pozycji')}</span>
+                    {activeProject.allocatedBudget > 0 && activeProjectPermissions.budget !== 'hide' && (
+                      <span className="font-bold">
+                        %{Math.min(100, Math.round((activeProjectMaterialCost / activeProject.allocatedBudget) * 100))}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Due Date', 'Teslim Tarihi', 'Termin realizacji')}</span>
-                  <span className="font-bold text-red-650 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> {formatDate(activeProject.targetDate, activeSettings)}
-                  </span>
+
+                {/* 3. Planned Start */}
+                <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Planned Start', 'Planlanan Başlama', 'Planowany start')}</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" /> {formatDate(activeProject.startDate, activeSettings)}
+                    </span>
+                  </div>
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Project Status', 'Proje Durumu', 'Status projektu')}</span>
-                  <span className={`font-bold uppercase tracking-wider text-[10px] ${
-                    activeProject.status === 'completed' ? 'text-emerald-500' :
-                    activeProject.status === 'ongoing' ? 'text-blue-550' :
-                    activeProject.status === 'suspended' ? 'text-rose-500' : 'text-slate-500'
-                  }`}>
-                    {activeProject.status === 'completed' ? t('Done', 'Bitti', 'Ukończono') :
-                     activeProject.status === 'ongoing' ? t('Ongoing', 'Devam Ediyor', 'W toku') :
-                     activeProject.status === 'suspended' ? t('Suspended', 'Askıda', 'Wstrzymany') : t('Planning', 'Planlama', 'Planowanie')}
-                  </span>
+
+                {/* 4. Due Date */}
+                <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Due Date', 'Teslim Tarihi', 'Termin realizacji')}</span>
+                    <span className="font-bold text-red-650 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" /> {formatDate(activeProject.targetDate, activeSettings)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5. Project Status */}
+                <div className="bg-slate-50 dark:bg-slate-800/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <span className="text-slate-400 block font-semibold uppercase tracking-wider text-[9px] mb-1">{t('Project Status', 'Proje Durumu', 'Status projektu')}</span>
+                    <span className={`font-bold uppercase tracking-wider text-[10px] ${
+                      activeProject.status === 'completed' ? 'text-emerald-500' :
+                      activeProject.status === 'ongoing' ? 'text-blue-550' :
+                      activeProject.status === 'suspended' ? 'text-rose-500' : 'text-slate-500'
+                    }`}>
+                      {activeProject.status === 'completed' ? t('Done', 'Bitti', 'Ukończono') :
+                       activeProject.status === 'ongoing' ? t('Ongoing', 'Devam Ediyor', 'W toku') :
+                       activeProject.status === 'suspended' ? t('Suspended', 'Askıda', 'Wstrzymany') : t('Planning', 'Planlama', 'Planowanie')}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -941,6 +1017,29 @@ export default function ProjectsView({
                       onChange={(e) => setProjBudget(Number(e.target.value))}
                       className="w-full text-sm px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 font-mono focus:ring-1 focus:ring-amber-500/25 transition-all bg-slate-50/30"
                     />
+                    {editingProject && (() => {
+                      const editMatCost = materials
+                        .filter(m => m.projectId === editingProject.id)
+                        .reduce((sum, m) => sum + (m.totalPrice || (m.quantity * m.unitPrice) || 0), 0);
+                      if (editMatCost <= 0) return null;
+                      return (
+                        <div className="flex items-center justify-between text-[11px] bg-amber-50 dark:bg-amber-950/30 p-2 rounded-lg border border-amber-200/60 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 mt-1">
+                          <div className="flex items-center gap-1.5">
+                            <ShoppingBag className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                            <span>{t('Materials: ', 'Kayıtlı Malzeme Tutarı: ', 'Koszty materiałów: ')}<strong>{formatMoney(editMatCost, activeSettings)}</strong></span>
+                          </div>
+                          {projBudget < editMatCost && (
+                            <button
+                              type="button"
+                              onClick={() => setProjBudget(editMatCost)}
+                              className="text-[10px] underline font-bold text-amber-700 hover:text-amber-900 cursor-pointer ml-2"
+                            >
+                              {t('Set as Budget', 'Bütçeyi Eşitle', 'Ustaw jako budżet')}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">{t('Status', 'Durum', 'Status')}</label>

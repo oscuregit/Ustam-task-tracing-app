@@ -121,10 +121,16 @@ export interface Proposal {
   clientName: string;
   clientCompany?: string;
   clientId?: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  clientAddress?: string;
+  clientNotes?: string;
   projectName: string;
   projectDescription: string;
   pricingType: 'project' | 'itemized';
   totalProjectPrice: number;
+  laborPrice?: number;
+  autoIncludeMaterials?: boolean;
   tasks: ProposalTask[];
   materials: ProposalMaterial[];
   status: 'draft' | 'sent' | 'accepted' | 'declined';

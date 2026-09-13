@@ -17,7 +17,13 @@ import {
   X, 
   ClipboardList, 
   Check, 
-  AlertTriangle 
+  AlertTriangle,
+  ShoppingBag,
+  Phone,
+  Mail,
+  MapPin,
+  User,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
@@ -65,10 +71,16 @@ export default function ProposalsView({
   const [clientName, setClientName] = useState('');
   const [clientCompany, setClientCompany] = useState('');
   const [clientClientId, setClientClientId] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientNotes, setClientNotes] = useState('');
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [pricingType, setPricingType] = useState<'project' | 'itemized'>('project');
+  const [laborPrice, setLaborPrice] = useState<number>(0);
   const [totalProjectPrice, setTotalProjectPrice] = useState<number>(0);
+  const [autoIncludeMaterials, setAutoIncludeMaterials] = useState<boolean>(true);
   const [validUntil, setValidUntil] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<Proposal['status']>('draft');
@@ -108,6 +120,29 @@ export default function ProposalsView({
     return en;
   };
 
+  // Helper to extract all registered customer data (phone, email, address, notes, company)
+  const getProposalCustomerDetails = (p: Proposal) => {
+    let matchedCustomer: Customer | undefined;
+    if (p.clientId && customers && customers.length > 0) {
+      matchedCustomer = customers.find(c => c.id === p.clientId);
+    }
+    if (!matchedCustomer && p.clientName && customers && customers.length > 0) {
+      const cleanName = p.clientName.trim().toLowerCase();
+      matchedCustomer = customers.find(c => c.name.trim().toLowerCase() === cleanName);
+    }
+
+    return {
+      name: p.clientName || matchedCustomer?.name || '',
+      company: p.clientCompany || matchedCustomer?.company || '',
+      phone: p.clientPhone || matchedCustomer?.phone || '',
+      email: p.clientEmail || matchedCustomer?.email || '',
+      address: p.clientAddress || matchedCustomer?.address || '',
+      notes: p.clientNotes || matchedCustomer?.notes || '',
+      matchedCustomer,
+      isRegistered: !!matchedCustomer
+    };
+  };
+
   // Real-time proposals stream subscription
   useEffect(() => {
     if (!userUid) return;
@@ -134,10 +169,16 @@ export default function ProposalsView({
     setClientName('');
     setClientCompany('');
     setClientClientId('');
+    setClientPhone('');
+    setClientEmail('');
+    setClientAddress('');
+    setClientNotes('');
     setProjectName('');
     setProjectDescription('');
     setPricingType('project');
+    setLaborPrice(0);
     setTotalProjectPrice(0);
+    setAutoIncludeMaterials(true);
     // Draft absolute default limit: 30 days from now
     const limitDate = new Date();
     limitDate.setDate(limitDate.getDate() + 30);
@@ -152,12 +193,32 @@ export default function ProposalsView({
   // Handle opening editor for edit mode
   const handleOpenEdit = (p: Proposal) => {
     setEditorId(p.id);
+    const custInfo = getProposalCustomerDetails(p);
     setClientName(p.clientName);
-    setClientCompany(p.clientCompany || '');
-    setClientClientId(p.clientId || '');
+    setClientCompany(p.clientCompany || custInfo.company || '');
+    setClientClientId(p.clientId || custInfo.matchedCustomer?.id || '');
+    setClientPhone(p.clientPhone || custInfo.phone || '');
+    setClientEmail(p.clientEmail || custInfo.email || '');
+    setClientAddress(p.clientAddress || custInfo.address || '');
+    setClientNotes(p.clientNotes || custInfo.notes || '');
     setProjectName(p.projectName);
     setProjectDescription(p.projectDescription || '');
     setPricingType(p.pricingType);
+    
+    const matSum = (p.materials || []).reduce((sum, m) => sum + ((Number(m.quantity) || 0) * (Number(m.unitPrice) || 0)), 0);
+    const tasksSum = (p.tasks || []).reduce((sum, t) => sum + (Number(t.price) || 0), 0);
+    const shouldInclude = p.autoIncludeMaterials !== false;
+    setAutoIncludeMaterials(shouldInclude);
+
+    if (p.laborPrice !== undefined) {
+      setLaborPrice(p.laborPrice);
+    } else {
+      if (p.pricingType === 'project') {
+        setLaborPrice(p.totalProjectPrice > matSum ? p.totalProjectPrice - matSum : p.totalProjectPrice);
+      } else {
+        setLaborPrice(tasksSum);
+      }
+    }
     setTotalProjectPrice(p.totalProjectPrice || 0);
     setValidUntil(p.validUntil);
     setNotes(p.notes || '');
@@ -221,10 +282,17 @@ export default function ProposalsView({
 
     const nextId = editorId || `prop-${Date.now()}`;
     
-    // Auto calculate total if itemized
-    let finalProjectPrice = totalProjectPrice;
+    const matTotal = autoIncludeMaterials ? proposalMaterials.reduce((sum, m) => sum + ((Number(m.quantity) || 0) * (Number(m.unitPrice) || 0)), 0) : 0;
+    const tasksTotal = proposalTasks.reduce((sum, current) => sum + (Number(current.price) || 0), 0);
+    
+    let finalProjectPrice = 0;
+    let savedLaborPrice = 0;
     if (pricingType === 'itemized') {
-      finalProjectPrice = proposalTasks.reduce((sum, current) => sum + current.price, 0);
+      savedLaborPrice = tasksTotal;
+      finalProjectPrice = tasksTotal + matTotal;
+    } else {
+      savedLaborPrice = Number(laborPrice) || 0;
+      finalProjectPrice = savedLaborPrice + matTotal;
     }
 
     const payload: Proposal = {
@@ -233,9 +301,15 @@ export default function ProposalsView({
       clientName: clientName.trim(),
       clientCompany: clientCompany.trim() || undefined,
       clientId: clientClientId || undefined,
+      clientPhone: clientPhone.trim() || undefined,
+      clientEmail: clientEmail.trim() || undefined,
+      clientAddress: clientAddress.trim() || undefined,
+      clientNotes: clientNotes.trim() || undefined,
       projectName: projectName.trim(),
       projectDescription: projectDescription.trim() || '',
       pricingType,
+      laborPrice: savedLaborPrice,
+      autoIncludeMaterials,
       totalProjectPrice: finalProjectPrice,
       tasks: proposalTasks,
       materials: proposalMaterials,
@@ -264,6 +338,8 @@ export default function ProposalsView({
         window.print();
         return;
       }
+
+      const clientInfo = getProposalCustomerDetails(previewProposal);
       
       const htmlContent = `
         <html>
@@ -309,9 +385,16 @@ export default function ProposalsView({
 
             <div class="meta-grid">
               <div class="meta-box">
-                <div class="meta-label">${t('Client Info', 'Alıcı Müşteri / Kurum', 'Dane Klienta')}</div>
-                <div class="meta-val" style="font-size: 15px; color: #0f172a; margin-bottom: 5px;">${previewProposal.clientName}</div>
-                ${previewProposal.clientCompany ? `<div style="font-size: 12px; color: #64748b;">${previewProposal.clientCompany}</div>` : ''}
+                <div class="meta-label">${t('Client Info', 'Alıcı Müşteri / Kurum Bilgileri', 'Dane Klienta')}</div>
+                <div class="meta-val" style="font-size: 15px; color: #0f172a; margin-bottom: 4px;">${clientInfo.name}</div>
+                ${clientInfo.company ? `<div style="font-size: 12px; color: #475569; font-weight: 600; margin-bottom: 6px;">${clientInfo.company}</div>` : ''}
+                <div style="font-size: 11px; color: #64748b; line-height: 1.6; margin-top: 6px; border-top: 1px solid #e2e8f0; padding-top: 6px;">
+                  ${clientInfo.phone ? `<div><strong style="color: #334155;">${t('Phone:', 'Telefon:', 'Tel:')}</strong> ${clientInfo.phone}</div>` : ''}
+                  ${clientInfo.email ? `<div><strong style="color: #334155;">${t('Email:', 'E-posta:', 'Email:')}</strong> ${clientInfo.email}</div>` : ''}
+                  ${clientInfo.address ? `<div><strong style="color: #334155;">${t('Client Address:', 'Müşteri Adresi:', 'Adres:')}</strong> ${clientInfo.address}</div>` : ''}
+                  <div><strong style="color: #334155;">${t('Target Site:', 'Tadilat Şantiyesi:', 'Obiekt:')}</strong> ${previewProposal.projectName}</div>
+                  ${clientInfo.notes ? `<div style="font-style: italic; color: #94a3b8; margin-top: 4px;"><strong>${t('Notes:', 'Müşteri Notu:', 'Uwagi:')}</strong> ${clientInfo.notes}</div>` : ''}
+                </div>
               </div>
               <div class="meta-box">
                 <div class="meta-label">${t('Proposal Details', 'Teklif Koşulları', 'Szczegóły oferty')}</div>
@@ -395,10 +478,28 @@ export default function ProposalsView({
             </div>
 
             <div class="total-box">
-              <div class="total-row">
-                <span>${t('Remodeling Base Total:', 'Teklif Temel Bedeli:', 'Wartość netto:')}</span>
-                <span style="font-family: monospace; font-weight: bold;">${formatMoney(previewProposal.totalProjectPrice || 0, settings)}</span>
-              </div>
+              ${(() => {
+                const previewMaterialsCost = (previewProposal.materials || []).reduce((sum, m) => sum + ((m.quantity || 0) * (m.unitPrice || 0)), 0);
+                const previewLaborCost = previewProposal.laborPrice !== undefined ? previewProposal.laborPrice : Math.max(0, (previewProposal.totalProjectPrice || 0) - previewMaterialsCost);
+                if (previewMaterialsCost > 0) {
+                  return `
+                    <div class="total-row">
+                      <span>${t('Labor & Works Total:', 'İşçilik ve Hizmet Bedeli:', 'Robocizna i usługi:')}</span>
+                      <span style="font-family: monospace; font-weight: bold;">${formatMoney(previewLaborCost, settings)}</span>
+                    </div>
+                    <div class="total-row">
+                      <span>${t('Materials & Allocation:', 'Malzeme ve Tedarik Bedeli:', 'Materiały i zaopatrzenie:')}</span>
+                      <span style="font-family: monospace; font-weight: bold; color: #d97706;">${formatMoney(previewMaterialsCost, settings)}</span>
+                    </div>
+                  `;
+                }
+                return `
+                  <div class="total-row">
+                    <span>${t('Remodeling Base Total:', 'Teklif Temel Bedeli:', 'Wartość netto:')}</span>
+                    <span style="font-family: monospace; font-weight: bold;">${formatMoney(previewProposal.totalProjectPrice || 0, settings)}</span>
+                  </div>
+                `;
+              })()}
               <div class="total-row">
                 <span>${t('VAT / KDV (0%):', 'KDV (%0):', 'Podatek VAT (%0):')}</span>
                 <span style="font-family: monospace; color: #94a3b8;">${formatMoney(0, settings)}</span>
@@ -416,7 +517,7 @@ export default function ProposalsView({
               </div>
               <div>
                 <div style="color: #94a3b8; font-style: italic; margin-bottom: 40px;">${t('Approved Sign of Client / Buyer', 'Tadilatı Onaylayan İşveren', 'Akceptacja Klienta')}</div>
-                <div class="sig-line">${previewProposal.clientName}</div>
+                <div class="sig-line">${clientInfo.name} ${clientInfo.company ? `(${clientInfo.company})` : ''}</div>
               </div>
             </div>
 
@@ -558,10 +659,21 @@ export default function ProposalsView({
   }, [proposals, searchTerm, statusFilter]);
 
   // Pricing total sum of draft/editor state
+  const computedMaterialsTotal = useMemo(() => {
+    return proposalMaterials.reduce((sum, m) => sum + ((Number(m.quantity) || 0) * (Number(m.unitPrice) || 0)), 0);
+  }, [proposalMaterials]);
+
+  const computedTasksTotal = useMemo(() => {
+    return proposalTasks.reduce((sum, t) => sum + (Number(t.price) || 0), 0);
+  }, [proposalTasks]);
+
   const computedDraftTotal = useMemo(() => {
-    if (pricingType === 'project') return totalProjectPrice;
-    return proposalTasks.reduce((sum, t) => sum + t.price, 0);
-  }, [pricingType, totalProjectPrice, proposalTasks]);
+    const matTotal = autoIncludeMaterials ? computedMaterialsTotal : 0;
+    if (pricingType === 'project') {
+      return (Number(laborPrice) || 0) + matTotal;
+    }
+    return computedTasksTotal + matTotal;
+  }, [pricingType, laborPrice, computedTasksTotal, computedMaterialsTotal, autoIncludeMaterials]);
 
   const getStatusBadgeStyles = (st: Proposal['status']) => {
     switch (st) {
@@ -660,6 +772,7 @@ export default function ProposalsView({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {filteredProposals.map((p) => {
                 const isProjectBased = p.pricingType === 'project';
+                const cardClient = getProposalCustomerDetails(p);
                 
                 return (
                   <div 
@@ -703,9 +816,37 @@ export default function ProposalsView({
                         <h3 className="font-bold text-slate-850 dark:text-slate-100 text-base flex items-center gap-1.5">
                           {p.projectName}
                         </h3>
-                        <p className="text-xs text-slate-450 dark:text-slate-400 font-medium">
-                          {t('Client:', 'Müşteri / Kurum:', 'Klient:')} <strong>{p.clientName}</strong> {p.clientCompany && `(${p.clientCompany})`}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-450 dark:text-slate-400 font-medium">
+                          <span>{t('Client:', 'Müşteri / Kurum:', 'Klient:')} <strong className="text-slate-750 dark:text-slate-200">{cardClient.name}</strong> {cardClient.company && `(${cardClient.company})`}</span>
+                          {cardClient.isRegistered && (
+                            <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded font-semibold">
+                              {t('Registered', 'Kayıtlı', 'Zarejestrowany')}
+                            </span>
+                          )}
+                        </div>
+
+                        {(cardClient.phone || cardClient.email || cardClient.address) && (
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400 pt-1">
+                            {cardClient.phone && (
+                              <span className="flex items-center gap-1">
+                                <Phone className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                {cardClient.phone}
+                              </span>
+                            )}
+                            {cardClient.email && (
+                              <span className="flex items-center gap-1 truncate max-w-[200px]" title={cardClient.email}>
+                                <Mail className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                <span className="truncate">{cardClient.email}</span>
+                              </span>
+                            )}
+                            {cardClient.address && (
+                              <span className="flex items-center gap-1 truncate max-w-[220px]" title={cardClient.address}>
+                                <MapPin className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                <span className="truncate">{cardClient.address}</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Description extract */}
@@ -733,12 +874,35 @@ export default function ProposalsView({
                     </div>
 
                     <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-slate-400 block tracking-wider uppercase">{t('Proposed Cost', 'Teklif Edilen Tutar', 'Zaproponowany Koszt')}</span>
-                        <span className="font-mono text-base font-black text-amber-500">
-                          {formatMoney(p.totalProjectPrice, settings)}
-                        </span>
-                      </div>
+                      {(() => {
+                        const cardMatTotal = (p.materials || []).reduce((sum, m) => sum + ((m.quantity || 0) * (m.unitPrice || 0)), 0);
+                        const cardLabor = p.laborPrice !== undefined ? p.laborPrice : Math.max(0, (p.totalProjectPrice || 0) - cardMatTotal);
+                        return (
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-slate-400 block tracking-wider uppercase font-bold">
+                              {t('Proposed Cost', 'Teklif Edilen Tutar', 'Zaproponowany Koszt')}
+                            </span>
+                            <div className="flex flex-wrap items-baseline gap-2">
+                              <span className="font-mono text-base font-black text-amber-500">
+                                {formatMoney(p.totalProjectPrice, settings)}
+                              </span>
+                              {cardMatTotal > 0 && (
+                                <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-200/60 dark:border-amber-900/60 flex items-center gap-1">
+                                  <ShoppingBag className="w-2.5 h-2.5 flex-shrink-0" />
+                                  <span>{t('Materials: ', 'Malzeme: ', 'Materiały: ')}{formatMoney(cardMatTotal, settings)}</span>
+                                </span>
+                              )}
+                            </div>
+                            {p.materials && p.materials.length > 0 && (
+                              <div className="text-[9px] text-slate-400 flex items-center gap-1.5">
+                                <span>{t('Labor: ', 'İşçilik: ', 'Robocizna: ')}{formatMoney(cardLabor, settings)}</span>
+                                <span>•</span>
+                                <span>{p.materials.length} {t('materials included', 'malzeme dahil', 'materiałów')}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {p.convertedToProjectId ? (
                         <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
@@ -818,10 +982,18 @@ export default function ProposalsView({
                               if (found) {
                                 setClientName(found.name);
                                 setClientCompany(found.company || '');
+                                setClientPhone(found.phone || '');
+                                setClientEmail(found.email || '');
+                                setClientAddress(found.address || '');
+                                setClientNotes(found.notes || '');
                               }
                             } else {
                               setClientName('');
                               setClientCompany('');
+                              setClientPhone('');
+                              setClientEmail('');
+                              setClientAddress('');
+                              setClientNotes('');
                             }
                           }}
                           className="w-full text-xs p-2.5 rounded-xl border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 font-sans cursor-pointer text-slate-850 dark:text-slate-100 focus:outline-none focus:border-amber-500"
@@ -831,6 +1003,33 @@ export default function ProposalsView({
                             <option key={cust.id} value={cust.id}>{cust.name} ({cust.company || t('Individual', 'Bireysel', 'Indywidualny')})</option>
                           ))}
                         </select>
+
+                        {clientClientId && (() => {
+                          const selectedCust = customers.find(c => c.id === clientClientId);
+                          if (!selectedCust) return null;
+                          return (
+                            <div className="mt-2 pt-2 border-t border-amber-500/20 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-amber-900 dark:text-amber-200">
+                              {selectedCust.phone && (
+                                <div className="flex items-center gap-1">
+                                  <Phone className="w-3 h-3 text-amber-600 flex-shrink-0" />
+                                  <span>{selectedCust.phone}</span>
+                                </div>
+                              )}
+                              {selectedCust.email && (
+                                <div className="flex items-center gap-1 truncate">
+                                  <Mail className="w-3 h-3 text-amber-600 flex-shrink-0" />
+                                  <span className="truncate">{selectedCust.email}</span>
+                                </div>
+                              )}
+                              {selectedCust.address && (
+                                <div className="flex items-center gap-1 truncate">
+                                  <MapPin className="w-3 h-3 text-amber-600 flex-shrink-0" />
+                                  <span className="truncate">{selectedCust.address}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -853,6 +1052,48 @@ export default function ProposalsView({
                         placeholder={t('e.g., Acme Corp LLC', 'Örn: Yılmaz Gıda Ltd. Şti.', 'np. Acme Sp. z o.o.')}
                         value={clientCompany}
                         onChange={(e) => setClientCompany(e.target.value)}
+                        className="w-full text-xs p-3 custom-input border rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-slate-400" />
+                        <span>{t('Client Phone', 'Müşteri Telefonu', 'Telefon klienta')}</span>
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder={t('e.g., +90 532 000 00 00', 'Örn: +90 532 000 00 00', 'np. +48 500 000 000')}
+                        value={clientPhone}
+                        onChange={(e) => setClientPhone(e.target.value)}
+                        className="w-full text-xs p-3 custom-input border rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <Mail className="w-3 h-3 text-slate-400" />
+                        <span>{t('Client Email', 'Müşteri E-posta Adresi', 'Adres e-mail klienta')}</span>
+                      </label>
+                      <input
+                        type="email"
+                        placeholder={t('e.g., client@example.com', 'Örn: musteri@sirket.com', 'np. klient@example.com')}
+                        value={clientEmail}
+                        onChange={(e) => setClientEmail(e.target.value)}
+                        className="w-full text-xs p-3 custom-input border rounded-xl"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 space-y-1">
+                      <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        <span>{t('Client Address / Billing Address', 'Müşteri Fatura / İkamet Adresi', 'Adres rozliczeniowy klienta')}</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder={t('e.g., Barbaros Bulvarı No:42 D:6 Beşiktaş / İstanbul', 'Örn: Barbaros Bulvarı No:42 D:6 Beşiktaş / İstanbul', 'np. ul. Marszałkowska 10, Warszawa')}
+                        value={clientAddress}
+                        onChange={(e) => setClientAddress(e.target.value)}
                         className="w-full text-xs p-3 custom-input border rounded-xl"
                       />
                     </div>
@@ -1098,46 +1339,63 @@ export default function ProposalsView({
                     </div>
 
                     {proposalMaterials.length > 0 && (
-                      <div className="border border-slate-200/50 rounded-xl overflow-hidden bg-white text-xs">
-                        <table className="w-full text-left">
-                          <thead className="bg-slate-50 font-bold text-slate-500">
-                            <tr>
-                              <th className="p-2.5">{t('Material Spec', 'Malzeme / Kategori', 'Materiał')}</th>
-                              <th className="p-2.5 w-28 text-center">{t('Qty', 'Miktar', 'Ilość')}</th>
-                              <th className="p-2.5 w-28 text-right">{t('Est Unit Price', 'Birim Fiyat', 'Cena jedn.')}</th>
-                              <th className="p-2.5 w-28 text-right">{t('Subtotal', 'Tutar', 'Łącznie')}</th>
-                              <th className="p-2.5 w-12 text-center"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {proposalMaterials.map((mat, idx) => (
-                              <tr key={mat.id} className="hover:bg-slate-50/40">
-                                <td className="p-2.5">
-                                  <div className="font-semibold text-slate-850">{mat.title}</div>
-                                  <div className="text-[10px] text-slate-400">{translateCategory(mat.category, settings.lang)}</div>
-                                </td>
-                                <td className="p-2.5 text-center text-slate-600 font-medium">
-                                  {mat.quantity} {mat.unit}
-                                </td>
-                                <td className="p-2.5 text-right font-mono text-slate-500">
-                                  {formatMoney(mat.unitPrice, settings)}
-                                </td>
-                                <td className="p-2.5 text-right font-mono font-bold text-slate-700">
-                                  {formatMoney(mat.quantity * mat.unitPrice, settings)}
-                                </td>
-                                <td className="p-2.5 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveLocalMaterial(mat.id)}
-                                    className="text-rose-600 hover:text-rose-800 p-0.5 cursor-pointer"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </td>
+                      <div className="space-y-3">
+                        <div className="border border-slate-200/50 rounded-xl overflow-hidden bg-white text-xs">
+                          <table className="w-full text-left">
+                            <thead className="bg-slate-50 font-bold text-slate-500">
+                              <tr>
+                                <th className="p-2.5">{t('Material Spec', 'Malzeme / Kategori', 'Materiał')}</th>
+                                <th className="p-2.5 w-28 text-center">{t('Qty', 'Miktar', 'Ilość')}</th>
+                                <th className="p-2.5 w-28 text-right">{t('Est Unit Price', 'Birim Fiyat', 'Cena jedn.')}</th>
+                                <th className="p-2.5 w-28 text-right">{t('Subtotal', 'Tutar', 'Łącznie')}</th>
+                                <th className="p-2.5 w-12 text-center"></th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {proposalMaterials.map((mat) => (
+                                <tr key={mat.id} className="hover:bg-slate-50/40">
+                                  <td className="p-2.5">
+                                    <div className="font-semibold text-slate-850">{mat.title}</div>
+                                    <div className="text-[10px] text-slate-400">{translateCategory(mat.category, settings.lang)}</div>
+                                  </td>
+                                  <td className="p-2.5 text-center text-slate-600 font-medium">
+                                    {mat.quantity} {mat.unit}
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono text-slate-500">
+                                    {formatMoney(mat.unitPrice, settings)}
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono font-bold text-slate-700">
+                                    {formatMoney(mat.quantity * mat.unitPrice, settings)}
+                                  </td>
+                                  <td className="p-2.5 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveLocalMaterial(mat.id)}
+                                      className="text-rose-600 hover:text-rose-800 p-0.5 cursor-pointer"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 rounded-xl text-xs">
+                          <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-bold">
+                            <ShoppingBag className="w-4 h-4 text-amber-600" />
+                            <span>{t('Total Material Cost for Quotation:', 'Teklife Eklenen Malzeme Maliyeti Toplamı:', 'Łączny koszt materiałów do oferty:')}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-black text-amber-700 dark:text-amber-400">
+                              {formatMoney(computedMaterialsTotal, settings)}
+                            </span>
+                            <span className="text-[10px] bg-amber-200/60 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-md font-bold">
+                              {proposalMaterials.length} {t('items', 'kalem', 'pozycji')}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1149,103 +1407,174 @@ export default function ProposalsView({
                     4. {t('Financial Structuring & Terms', 'Fiyatlandırma, Vergi ve Ödeme Koşulları', 'Struktura Finansowa i Warunki')}
                   </h4>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 rounded-xl border border-slate-150 bg-slate-50/30">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 block">{t('Pricing Strategy', 'Hesaplama Yöntemi', 'Metoda wyceny')}</label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 text-xs font-bold cursor-pointer bg-white p-3.5 rounded-xl border border-slate-150 flex-grow hover:border-amber-400">
-                          <input
-                            type="radio"
-                            name="pricingType"
-                            checked={pricingType === 'project'}
-                            onChange={() => setPricingType('project')}
-                            className="accent-amber-500"
-                          />
-                          <div>
-                            <div>{t('Lump Sum / Project Price', 'Götürü / Sabit Proje Fiyatı', 'Kwota ryczałtowa')}</div>
-                            <span className="text-[9px] text-slate-400 font-normal">{t('Specify total cost directly', 'Toplam bedeli elinizle yazın', 'Wpisz całkowity koszt ręcznie')}</span>
-                          </div>
-                        </label>
+                  <div className="space-y-4 p-4 rounded-xl border border-slate-150 bg-slate-50/30">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 block">{t('Pricing Strategy', 'Hesaplama Yöntemi', 'Metoda wyceny')}</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <label className={`flex items-start gap-2 text-xs font-bold cursor-pointer p-3 rounded-xl border transition-colors ${pricingType === 'project' ? 'bg-amber-500/10 border-amber-400 text-slate-900' : 'bg-white border-slate-150 text-slate-700 hover:border-slate-300'}`}>
+                            <input
+                              type="radio"
+                              name="pricingType"
+                              checked={pricingType === 'project'}
+                              onChange={() => setPricingType('project')}
+                              className="accent-amber-500 mt-0.5"
+                            />
+                            <div>
+                              <div>{t('Lump Sum / Labor Price', 'Götürü / İşçilik Hizmet Bedeli', 'Kwota ryczałtowa')}</div>
+                              <span className="text-[9px] text-slate-400 font-normal block leading-tight mt-0.5">{t('Fixed labor cost + auto material cost', 'İşçilik bedelini girin, malzeme otomatik eklenir', 'Wpisz robociznę, materiały doliczą się')}</span>
+                            </div>
+                          </label>
 
-                        <label className="flex items-center gap-2 text-xs font-bold cursor-pointer bg-white p-3.5 rounded-xl border border-slate-150 flex-grow hover:border-amber-400">
+                          <label className={`flex items-start gap-2 text-xs font-bold cursor-pointer p-3 rounded-xl border transition-colors ${pricingType === 'itemized' ? 'bg-amber-500/10 border-amber-400 text-slate-900' : 'bg-white border-slate-150 text-slate-700 hover:border-slate-300'}`}>
+                            <input
+                              type="radio"
+                              name="pricingType"
+                              checked={pricingType === 'itemized'}
+                              onChange={() => setPricingType('itemized')}
+                              className="accent-amber-500 mt-0.5"
+                            />
+                            <div>
+                              <div>{t('Itemized Task Sum', 'Görev Birim Toplamı', 'Suma zadań jednostkowych')}</div>
+                              <span className="text-[9px] text-slate-400 font-normal block leading-tight mt-0.5">{t('Sum of tasks prices + material cost', 'Görev bedelleri + malzeme maliyeti toplanır', 'Koszty zadań + materiały')}</span>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Material Auto-Include Toggle */}
+                      <div className="space-y-2 flex flex-col justify-end">
+                        <label className="text-xs font-bold text-slate-500 block">{t('Material Integration', 'Malzeme Maliyeti Entegrasyonu', 'Integracja materiałów')}</label>
+                        <label className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-amber-400 transition-colors">
                           <input
-                            type="radio"
-                            name="pricingType"
-                            checked={pricingType === 'itemized'}
-                            onChange={() => setPricingType('itemized')}
-                            className="accent-amber-500"
+                            type="checkbox"
+                            checked={autoIncludeMaterials}
+                            onChange={(e) => setAutoIncludeMaterials(e.target.checked)}
+                            className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
                           />
-                          <div>
-                            <div>{t('Itemized Task Sum', 'Görev Birim Toplamı', 'Suma zadań jednostkowych')}</div>
-                            <span className="text-[9px] text-slate-400 font-normal">{t('Sum of tasks prices above', 'Görevlerdeki tutarlar toplanır', 'Koszty sumują się z zadań powyżej')}</span>
+                          <div className="text-xs">
+                            <span className="font-bold text-slate-800 block">{t('Include Material Costs in Total Budget', 'Malzeme Maliyetlerini Teklif Toplamına Ekle', 'Uwzględnij materiały w całkowitym budżecie')}</span>
+                            <span className="text-[10px] text-slate-400 block">{t('Automatically appends the materials calculated in Step 3 to the grand proposal total', '3. Adımda girilen malzeme tutarını genel teklif bütçesine otomatik ekler', 'Automatycznie dodaje koszt materiałów do sumy')}</span>
                           </div>
                         </label>
                       </div>
                     </div>
 
-                    <div className="space-y-1 justify-center flex flex-col">
-                      <label className="text-xs font-bold text-slate-500">{t('Proposed Core Price *', 'Teklif Edilecek Ana Tutar *', 'Sugerowana cena główna *')}</label>
-                      {pricingType === 'project' ? (
-                        <input
-                          type="number"
-                          required
-                          min={0}
-                          placeholder={t('e.g., 250000', 'Örn: 250000', 'np. 250000')}
-                          value={totalProjectPrice}
-                          onChange={(e) => setTotalProjectPrice(Number(e.target.value))}
-                          className="w-full text-base p-3 custom-input border rounded-xl font-mono font-bold text-slate-800"
-                        />
-                      ) : (
-                        <div className="p-3 bg-slate-100 rounded-xl border border-slate-200">
-                          <span className="text-[10px] text-slate-450 block font-bold uppercase tracking-wide">{t('Calculated Sum of Tasks (Read-Only)', 'Görev Bedelleri Toplamı (Okunabilir)', 'Suma zadań (Tylko do odczytu)')}</span>
-                          <span className="font-mono text-lg font-black text-slate-800">
-                            {formatMoney(computedDraftTotal, settings)}
+                    {/* Cost Breakdown Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                      {/* Labor / Services */}
+                      <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          {pricingType === 'project' ? t('Labor / Service Base Price', 'İşçilik / Hizmet Bedeli', 'Robocizna / Usługi') : t('Tasks Sum (Labor)', 'Görevler Toplamı', 'Suma zadań')}
+                        </span>
+                        {pricingType === 'project' ? (
+                          <div className="space-y-1">
+                            <input
+                              type="number"
+                              min={0}
+                              placeholder="0"
+                              value={laborPrice}
+                              onChange={(e) => setLaborPrice(Number(e.target.value))}
+                              className="w-full font-mono text-base font-bold p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-850"
+                            />
+                            <span className="text-[9px] text-slate-400 block">{t('Enter net labor & service fee', 'İşçilik & taşeron bedelini girin', 'Podaj koszt robocizny')}</span>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="font-mono text-base font-bold text-slate-800 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                              {formatMoney(computedTasksTotal, settings)}
+                            </div>
+                            <span className="text-[9px] text-slate-400 block">{proposalTasks.length} {t('tasks itemized', 'kalem görev', 'zadań')}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Materials Component */}
+                      <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          {t('Materials Total', 'Malzeme Maliyeti', 'Materiały łącznie')}
+                        </span>
+                        <div className="p-2 bg-amber-50/60 border border-amber-200/80 rounded-lg flex items-center justify-between">
+                          <span className="font-mono text-base font-bold text-amber-700">
+                            {formatMoney(computedMaterialsTotal, settings)}
+                          </span>
+                          <span className="text-[10px] font-bold text-amber-600">
+                            {autoIncludeMaterials ? t('+ Included', '+ Dahil Edildi', '+ Wliczone') : t('Excluded', 'Dahil Değil', 'Nie wliczone')}
                           </span>
                         </div>
-                      )}
+                        <span className="text-[9px] text-slate-400 block">
+                          {proposalMaterials.length > 0 ? `${proposalMaterials.length} ${t('materials from list', 'malzeme listelendi', 'materiałów')}` : t('No materials added in Step 3', 'Henüz malzeme eklenmedi', 'Brak materiałów')}
+                        </span>
+                      </div>
+
+                      {/* Grand Total */}
+                      <div className="p-3 bg-amber-500/10 rounded-xl border-2 border-amber-400/60 space-y-1.5">
+                        <span className="text-[10px] font-black text-amber-800 uppercase tracking-wider block">
+                          {t('Total Proposal Budget', 'Toplam Teklif Bütçesi', 'Całkowita wycena')}
+                        </span>
+                        <div className="p-2 bg-white/90 border border-amber-300/60 rounded-lg font-mono text-lg font-black text-amber-600">
+                          {formatMoney(computedDraftTotal, settings)}
+                        </div>
+                        <span className="text-[9px] text-amber-700 font-medium block">
+                          {autoIncludeMaterials && computedMaterialsTotal > 0
+                            ? t('Labor + Materials calculated automatically', 'İşçilik + Malzemeler otomatik toplandı', 'Robocizna + Materiały')
+                            : t('Based on labor/tasks only', 'Yalnızca işçilik/görevler', 'Tylko robocizna')}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500">{t('Status', 'Teklif Durumu', 'Status oferty')}</label>
-                      <select
-                        value={status}
-                        onChange={(e) => setStatus(e.target.value as Proposal['status'])}
-                        className="w-full text-xs p-3 custom-input border rounded-xl bg-white cursor-pointer"
-                      >
-                        <option value="draft">{t('Draft (Internal)', 'Taslak (Henüz İletilmedi)', 'Szkic (Wewnętrzny)')}</option>
-                        <option value="sent">{t('Sent to Client', 'Müşteriye Gönderildi', 'Wysłana do klienta')}</option>
-                        <option value="accepted">{t('Accepted (Approved)', 'Müşteri Tarafından Kabul Edildi', 'Zaakceptowana przez klienta')}</option>
-                        <option value="declined">{t('Declined (Rejected)', 'Reddedildi / Revize Bekliyor', 'Odrzucona przez klienta')}</option>
-                      </select>
-                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500">{t('Status', 'Teklif Durumu', 'Status oferty')}</label>
+                        <select
+                          value={status}
+                          onChange={(e) => setStatus(e.target.value as Proposal['status'])}
+                          className="w-full text-xs p-3 custom-input border rounded-xl bg-white cursor-pointer"
+                        >
+                          <option value="draft">{t('Draft (Internal)', 'Taslak (Henüz İletilmedi)', 'Szkic (Wewnętrzny)')}</option>
+                          <option value="sent">{t('Sent to Client', 'Müşteriye Gönderildi', 'Wysłana do klienta')}</option>
+                          <option value="accepted">{t('Accepted (Approved)', 'Müşteri Tarafından Kabul Edildi', 'Zaakceptowana przez klienta')}</option>
+                          <option value="declined">{t('Declined (Rejected)', 'Reddedildi / Revize Bekliyor', 'Odrzucona przez klienta')}</option>
+                        </select>
+                      </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500">{t('Payment & Guarantee Notes', 'Ödeme ve Sözleşme Notları', 'Uwagi dotyczące płatności i gwarancji')}</label>
-                      <input
-                        type="text"
-                        placeholder={t('e.g., 40% upfront deposit, 40% post construction phase, 20% key handover commission.', 'Örn: %40 avans, %40 kaba inşaat bitimi, %20 anahtar tesliminde.', 'np. 40% zaliczki, 40% po stanie surowym, 20% przy odbiorze kluczy.')}
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        className="w-full text-xs p-3 custom-input border rounded-xl"
-                      />
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500">{t('Payment & Guarantee Notes', 'Ödeme ve Sözleşme Notları', 'Uwagi dotyczące płatności i gwarancji')}</label>
+                        <input
+                          type="text"
+                          placeholder={t('e.g., 40% upfront deposit, 40% post construction phase, 20% key handover commission.', 'Örn: %40 avans, %40 kaba inşaat bitimi, %20 anahtar tesliminde.', 'np. 40% zaliczki, 40% po stanie surowym, 20% przy odbiorze kluczy.')}
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          className="w-full text-xs p-3 custom-input border rounded-xl"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditorOpen(false)}
-                    className="px-5 py-3 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-600 font-bold cursor-pointer"
-                  >
-                    {t('Cancel', 'İptal', 'Anuluj')}
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl cursor-pointer shadow-xs"
-                  >
-                    {editorId ? t('Update Proposal Spec', 'Güncelle ve Kaydet', 'Aktualizuj ofertę') : t('Create Proposal', 'Teklifi Oluştur', 'Utwórz ofertę')}
-                  </button>
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 font-bold uppercase text-[10px]">{t('Total Proposal Budget:', 'Genel Teklif Tutarı:', 'Całkowita wartość:')}</span>
+                    <span className="font-mono text-base font-black text-amber-600 dark:text-amber-400">{formatMoney(computedDraftTotal, settings)}</span>
+                    {autoIncludeMaterials && computedMaterialsTotal > 0 && (
+                      <span className="text-[10px] text-slate-400 font-medium">({t('Includes materials: ', 'Malzeme dahil: ', 'W tym materiały: ')}{formatMoney(computedMaterialsTotal, settings)})</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditorOpen(false)}
+                      className="px-5 py-3 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-600 font-bold cursor-pointer"
+                    >
+                      {t('Cancel', 'İptal', 'Anuluj')}
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl cursor-pointer shadow-xs"
+                    >
+                      {editorId ? t('Update Proposal Spec', 'Güncelle ve Kaydet', 'Aktualizuj ofertę') : t('Create Proposal', 'Teklifi Oluştur', 'Utwórz ofertę')}
+                    </button>
+                  </div>
                 </div>
               </form>
             </motion.div>
@@ -1304,12 +1633,70 @@ export default function ProposalsView({
 
                 {/* Client detail column */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 text-xs mb-8">
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800/20 print:bg-slate-50 border border-slate-100 dark:border-slate-800 rounded-xl space-y-2">
-                    <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">{t('PREPARED FOR', 'ALICI VE MÜŞTERİ BİLGİLERİ', 'PRZYGOTOWANO DLA')}</span>
-                    <div className="font-extrabold text-sm text-slate-850 dark:text-white print:text-black">{previewProposal.clientName}</div>
-                    {previewProposal.clientCompany && <div className="font-medium text-slate-500">{previewProposal.clientCompany}</div>}
-                    <div className="text-slate-400">{t('Renovation Target Address:', 'Tadilat Şantiye Adresi:', 'Adres remontu:')} {previewProposal.projectName}</div>
-                  </div>
+                  {(() => {
+                    const clientDetails = getProposalCustomerDetails(previewProposal);
+                    return (
+                      <div className="p-4 bg-slate-50 dark:bg-slate-800/20 print:bg-slate-50 border border-slate-100 dark:border-slate-800 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">
+                            {t('PREPARED FOR / CLIENT INFO', 'ALICI VE MÜŞTERİ BİLGİLERİ', 'DANE KLIENTA')}
+                          </span>
+                          {clientDetails.isRegistered && (
+                            <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-md font-bold">
+                              {t('Registered Client', 'Kayıtlı Müşteri', 'Zarejestrowany Klient')}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="font-extrabold text-sm text-slate-850 dark:text-white print:text-black flex items-center gap-1.5">
+                          <User className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                          <span>{clientDetails.name}</span>
+                        </div>
+
+                        {clientDetails.company && (
+                          <div className="font-medium text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                            <Building2 className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            <span>{clientDetails.company}</span>
+                          </div>
+                        )}
+
+                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700/50 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
+                          {clientDetails.phone && (
+                            <div className="flex items-center gap-2">
+                              <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                              <span>{clientDetails.phone}</span>
+                            </div>
+                          )}
+
+                          {clientDetails.email && (
+                            <div className="flex items-center gap-2">
+                              <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                              <span>{clientDetails.email}</span>
+                            </div>
+                          )}
+
+                          {clientDetails.address && (
+                            <div className="flex items-start gap-2">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+                              <span><strong className="text-slate-500">{t('Address:', 'Müşteri Adresi:', 'Adres:')}</strong> {clientDetails.address}</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-start gap-2 text-slate-500">
+                            <Briefcase className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+                            <span><strong className="text-slate-700 dark:text-slate-300">{t('Target Site:', 'Tadilat Şantiyesi:', 'Miejsce prac:')}</strong> {previewProposal.projectName}</span>
+                          </div>
+
+                          {clientDetails.notes && (
+                            <div className="flex items-start gap-2 text-[11px] italic text-slate-500 bg-slate-100/50 dark:bg-slate-800/40 p-2 rounded-lg mt-1">
+                              <Info className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                              <span><strong>{t('Customer Notes:', 'Müşteri Kayıt Notu:', 'Uwagi klienta:')}</strong> {clientDetails.notes}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="p-4 bg-slate-50 dark:bg-slate-800/20 print:bg-slate-50 border border-slate-100 dark:border-slate-800 rounded-xl space-y-2">
                     <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">{t('SCOPE OF WORK', 'PLANLANAN TADİLAT KAPSAMI', 'ZAKRES PRAC')}</span>
@@ -1405,22 +1792,43 @@ export default function ProposalsView({
                     <p className="text-slate-500 font-sans italic">{previewProposal.notes || t('Standard contract terms apply. Turnkey handover is subject to stage payments verification.', 'Standart tadilat sözleşmesi kuralları geçerlidir. Ödemelerin belirtilen vadelerde yapılması taahhüt edilir.', 'Obowiązują standardowe warunki umowy. Przekazanie pod klucz zależy od weryfikacji etapów płatności.')}</p>
                   </div>
 
-                  <div className="w-full sm:w-72 bg-slate-50 dark:bg-slate-800/10 print:bg-slate-50 p-4 border border-slate-150 rounded-xl space-y-2 text-right">
-                    <div className="flex justify-between font-medium text-slate-600">
-                      <span>{t('Remodeling Base Total:', 'Teklif Temel Bedeli:', 'Częściowa sumaryczna:')}</span>
-                      <strong className="font-mono text-slate-800 dark:text-slate-200 print:text-black">{formatMoney(previewProposal.totalProjectPrice, settings)}</strong>
-                    </div>
-                    <div className="flex justify-between font-medium text-slate-400">
-                      <span>{t('VAT / KDV (Exempt/0%):', 'KDV İndirimi (%0):', 'Podatek VAT (%0):')}</span>
-                      <strong className="font-mono">{formatMoney(0, settings)}</strong>
-                    </div>
-                    <div className="h-px bg-slate-200 my-2" />
-                    <div className="flex justify-between">
-                      <span className="text-sm font-black text-slate-850 dark:text-white print:text-black uppercase">{t('Proposed Net Total:', 'Teklif Hakediş Bedeli:', 'Ostateczny koszt netto:')}</span>
-                      <strong className="font-mono text-base font-black text-amber-500">
-                        {formatMoney(previewProposal.totalProjectPrice, settings)}
-                      </strong>
-                    </div>
+                  <div className="w-full sm:w-80 bg-slate-50 dark:bg-slate-800/10 print:bg-slate-50 p-4 border border-slate-150 rounded-xl space-y-2 text-right">
+                    {(() => {
+                      const prevMatCost = (previewProposal.materials || []).reduce((sum, m) => sum + ((m.quantity || 0) * (m.unitPrice || 0)), 0);
+                      const prevLaborCost = previewProposal.laborPrice !== undefined ? previewProposal.laborPrice : Math.max(0, (previewProposal.totalProjectPrice || 0) - prevMatCost);
+                      return (
+                        <>
+                          {prevMatCost > 0 ? (
+                            <>
+                              <div className="flex justify-between font-medium text-slate-600 dark:text-slate-300 print:text-slate-600">
+                                <span>{t('Labor & Works:', 'İşçilik ve Hizmet Bedeli:', 'Robocizna i usługi:')}</span>
+                                <strong className="font-mono text-slate-800 dark:text-slate-200 print:text-black">{formatMoney(prevLaborCost, settings)}</strong>
+                              </div>
+                              <div className="flex justify-between font-medium text-amber-700 dark:text-amber-400 print:text-amber-700">
+                                <span>{t('Materials Cost:', 'Malzeme Tutarı:', 'Koszty materiałów:')}</span>
+                                <strong className="font-mono">{formatMoney(prevMatCost, settings)}</strong>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex justify-between font-medium text-slate-600">
+                              <span>{t('Remodeling Base Total:', 'Teklif Temel Bedeli:', 'Częściowa sumaryczna:')}</span>
+                              <strong className="font-mono text-slate-800 dark:text-slate-200 print:text-black">{formatMoney(previewProposal.totalProjectPrice, settings)}</strong>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-medium text-slate-400">
+                            <span>{t('VAT / KDV (Exempt/0%):', 'KDV İndirimi (%0):', 'Podatek VAT (%0):')}</span>
+                            <strong className="font-mono">{formatMoney(0, settings)}</strong>
+                          </div>
+                          <div className="h-px bg-slate-200 my-2" />
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-sm font-black text-slate-850 dark:text-white print:text-black uppercase">{t('Proposed Net Total:', 'Teklif Toplam Bedeli:', 'Ostateczny koszt netto:')}</span>
+                            <strong className="font-mono text-base font-black text-amber-500">
+                              {formatMoney(previewProposal.totalProjectPrice, settings)}
+                            </strong>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1435,8 +1843,8 @@ export default function ProposalsView({
 
                   <div className="space-y-12">
                     <p className="text-slate-400 italic block">{t('Approval Signature of Client', 'Teklif Onaylayan Müşteri', 'Podpis Akceptacyjny Klienta')}</p>
-                    <div className="border-t border-slate-205 pt-2 font-bold text-slate-400">
-                      {previewProposal.clientName}
+                    <div className="border-t border-slate-205 pt-2 font-bold text-slate-700 dark:text-slate-200 print:text-black">
+                      {previewProposal.clientName} {previewProposal.clientCompany ? `(${previewProposal.clientCompany})` : ''}
                     </div>
                   </div>
                 </div>

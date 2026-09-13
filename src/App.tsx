@@ -819,22 +819,24 @@ export default function App() {
       <div className="flex-grow w-full max-w-7xl mx-auto px-4 md:px-6 py-6 flex flex-col md:flex-row gap-6">
         
         {/* RESPONSIVE FLOATING SIDEBAR NAVIGATION */}
-        <nav className="w-full md:w-64 flex-shrink-0 space-y-1 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-255 border-slate-200 dark:border-slate-800 shadow-xs self-start">
-          <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3 mb-3">
+        <nav className="w-full md:w-64 flex-shrink-0 space-y-1 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs self-start text-left">
+          <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3 mb-3 text-left">
             {t('MANAGEMENT CONSOLE', 'YÖNETİM PANELİ', 'KONSOLA ZARZĄDZANIA')}
           </div>
           
           <button
             id="tab-btn-dashboard"
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-start text-left text-start gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
               activeTab === 'dashboard' 
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
             }`}
+            style={{ textAlign: 'left' }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'dashboard' ? 'bg-blue-600' : 'bg-transparent'}`} />
-            <LayoutDashboard className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('dashboard', settings.lang)}
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeTab === 'dashboard' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <LayoutDashboard className="w-4 h-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left text-start leading-snug block" style={{ textAlign: 'left' }}>{getTranslatedLabel('dashboard', settings.lang)}</span>
           </button>
 
           <button
@@ -843,105 +845,121 @@ export default function App() {
               setDeepSelectProjectId(undefined);
               setActiveTab('projects');
             }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-start text-left text-start gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
               activeTab === 'projects' 
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
             }`}
+            style={{ textAlign: 'left' }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'projects' ? 'bg-blue-600' : 'bg-transparent'}`} />
-            <Building2 className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('projects', settings.lang)}
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeTab === 'projects' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <Building2 className="w-4 h-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left text-start leading-snug block" style={{ textAlign: 'left' }}>{getTranslatedLabel('projects', settings.lang)}</span>
           </button>
 
           <button
             id="tab-btn-proposals"
             onClick={() => setActiveTab('proposals')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-start text-left text-start gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
               activeTab === 'proposals' 
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
             }`}
+            style={{ textAlign: 'left' }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'proposals' ? 'bg-blue-600' : 'bg-transparent'}`} />
-            <FileText className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('proposals', settings.lang)}
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeTab === 'proposals' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <FileText className="w-4 h-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left text-start leading-snug block" style={{ textAlign: 'left' }}>{getTranslatedLabel('proposals', settings.lang)}</span>
           </button>
 
           <button
             id="tab-btn-budget"
             onClick={() => setActiveTab('budget')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-start text-left text-start gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
               activeTab === 'budget' 
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
             }`}
+            style={{ textAlign: 'left' }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'budget' ? 'bg-blue-600' : 'bg-transparent'}`} />
-            <ShoppingBag className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('budget', settings.lang)}
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeTab === 'budget' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <ShoppingBag className="w-4 h-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left text-start leading-snug block" style={{ textAlign: 'left' }}>{getTranslatedLabel('budget', settings.lang)}</span>
           </button>
 
           <button
             id="tab-btn-accounting"
             onClick={() => setActiveTab('accounting')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-start text-left text-start gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
               activeTab === 'accounting' 
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white'
             }`}
+            style={{ textAlign: 'left' }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'accounting' ? 'bg-blue-600' : 'bg-transparent'}`} />
-            <Calculator className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('accounting', settings.lang)}
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeTab === 'accounting' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <Calculator className="w-4 h-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left text-start leading-snug block" style={{ textAlign: 'left' }}>{getTranslatedLabel('accounting', settings.lang)}</span>
           </button>
 
           <button
             id="tab-btn-time-management"
             onClick={() => setActiveTab('time-management')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-start text-left text-start gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
               activeTab === 'time-management' 
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white'
             }`}
+            style={{ textAlign: 'left' }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'time-management' ? 'bg-blue-600' : 'bg-transparent'}`} />
-            <Clock className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('time-management', settings.lang)}
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeTab === 'time-management' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <Clock className="w-4 h-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left text-start leading-snug block" style={{ textAlign: 'left' }}>{getTranslatedLabel('time-management', settings.lang)}</span>
           </button>
 
           <button
             id="tab-btn-customers"
             onClick={() => setActiveTab('customers')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-start text-left text-start gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
               activeTab === 'customers' 
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white'
             }`}
+            style={{ textAlign: 'left' }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'customers' ? 'bg-blue-600' : 'bg-transparent'}`} />
-            <User className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('customers', settings.lang)}
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeTab === 'customers' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <User className="w-4 h-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left text-start leading-snug block" style={{ textAlign: 'left' }}>{getTranslatedLabel('customers', settings.lang)}</span>
           </button>
 
           <button
             id="tab-btn-collaboration"
             onClick={() => setActiveTab('collaboration')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-start text-left text-start gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
               activeTab === 'collaboration' 
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white'
             }`}
+            style={{ textAlign: 'left' }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'collaboration' ? 'bg-blue-600' : 'bg-transparent'}`} />
-            <Users className="w-4 h-4 flex-shrink-0 text-slate-400" /> {getTranslatedLabel('collaboration', settings.lang)}
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeTab === 'collaboration' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <Users className="w-4 h-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left text-start leading-snug block" style={{ textAlign: 'left' }}>{getTranslatedLabel('collaboration', settings.lang)}</span>
           </button>
 
           <button
             id="tab-btn-settings"
             onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-start text-left text-start gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
               activeTab === 'settings' 
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold' 
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-950 dark:hover:text-white'
             }`}
+            style={{ textAlign: 'left' }}
           >
-            <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'settings' ? 'bg-blue-600' : 'bg-transparent'}`} />
-            <SettingsIcon className="w-4 h-4 flex-shrink-0 text-slate-400 animate-spin-slow" /> {getTranslatedLabel('settings', settings.lang)}
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeTab === 'settings' ? 'bg-blue-600' : 'bg-transparent'}`} />
+            <SettingsIcon className="w-4 h-4 flex-shrink-0 text-slate-400 animate-spin-slow" />
+            <span className="flex-1 text-left text-start leading-snug block" style={{ textAlign: 'left' }}>{getTranslatedLabel('settings', settings.lang)}</span>
           </button>
 
           <div className="h-px bg-slate-100 dark:bg-slate-800 my-4" />
@@ -995,6 +1013,7 @@ export default function App() {
                 <ProjectsView 
                   projects={allProjects}
                   tasks={allTasks}
+                  materials={allMaterials}
                   onAddProject={handleAddProject}
                   onUpdateProject={handleUpdateProject}
                   onDeleteProject={handleDeleteProject}

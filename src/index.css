@@ -19,3 +19,29 @@ html.dark body {
   background-color: #0b0f19; /* Immersive very dark slate */
   color: #f1f5f9; /* Slate 100 text */
 }
+
+/* Sidebar and Navigation Panel Left-Alignment */
+nav button,
+nav button span,
+#tab-btn-dashboard,
+#tab-btn-projects,
+#tab-btn-proposals,
+#tab-btn-budget,
+#tab-btn-accounting,
+#tab-btn-time-management,
+#tab-btn-customers,
+#tab-btn-collaboration,
+#tab-btn-settings,
+#tab-btn-dashboard span,
+#tab-btn-projects span,
+#tab-btn-proposals span,
+#tab-btn-budget span,
+#tab-btn-accounting span,
+#tab-btn-time-management span,
+#tab-btn-customers span,
+#tab-btn-collaboration span,
+#tab-btn-settings span {
+  text-align: left !important;
+  text-align: start !important;
+  justify-content: flex-start !important;
+}
