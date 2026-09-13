@@ -23,7 +23,8 @@ import {
   Mail,
   MapPin,
   User,
-  Info
+  Info,
+  Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
@@ -95,12 +96,27 @@ export default function ProposalsView({
   const [newTaskDuration, setNewTaskDuration] = useState(3);
   const [newTaskPrice, setNewTaskPrice] = useState(0);
 
+  // Task inline editing states
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskDesc, setEditTaskDesc] = useState('');
+  const [editTaskDuration, setEditTaskDuration] = useState(1);
+  const [editTaskPrice, setEditTaskPrice] = useState(0);
+
   // Material inline insert states
   const [newMatTitle, setNewMatTitle] = useState('');
   const [newMatCategory, setNewMatCategory] = useState<MaterialCategory>('Kaba İnşaat');
   const [newMatQuantity, setNewMatQuantity] = useState(1);
   const [newMatUnit, setNewMatUnit] = useState('adet');
   const [newMatUnitPrice, setNewMatUnitPrice] = useState(0);
+
+  // Material inline editing states
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
+  const [editMatTitle, setEditMatTitle] = useState('');
+  const [editMatCategory, setEditMatCategory] = useState<MaterialCategory>('Kaba İnşaat');
+  const [editMatQuantity, setEditMatQuantity] = useState(1);
+  const [editMatUnit, setEditMatUnit] = useState('adet');
+  const [editMatUnitPrice, setEditMatUnitPrice] = useState(0);
 
   // Listing states
   const [searchTerm, setSearchTerm] = useState('');
@@ -187,12 +203,16 @@ export default function ProposalsView({
     setStatus('draft');
     setProposalTasks([]);
     setProposalMaterials([]);
+    setEditingTaskId(null);
+    setEditingMaterialId(null);
     setIsEditorOpen(true);
   };
 
   // Handle opening editor for edit mode
   const handleOpenEdit = (p: Proposal) => {
     setEditorId(p.id);
+    setEditingTaskId(null);
+    setEditingMaterialId(null);
     const custInfo = getProposalCustomerDetails(p);
     setClientName(p.clientName);
     setClientCompany(p.clientCompany || custInfo.company || '');
@@ -245,8 +265,53 @@ export default function ProposalsView({
     setNewTaskPrice(0);
   };
 
+  // Start editing existing task item
+  const handleStartEditTask = (tk: ProposalTask) => {
+    setEditingTaskId(tk.id);
+    setEditTaskTitle(tk.title);
+    setEditTaskDesc(tk.description || '');
+    setEditTaskDuration(tk.durationDays || 1);
+    setEditTaskPrice(tk.price || 0);
+  };
+
+  // Cancel editing task item
+  const handleCancelEditTask = () => {
+    setEditingTaskId(null);
+    setEditTaskTitle('');
+    setEditTaskDesc('');
+    setEditTaskDuration(1);
+    setEditTaskPrice(0);
+  };
+
+  // Save changes to existing task item
+  const handleSaveEditTask = () => {
+    if (!editingTaskId) return;
+    if (!editTaskTitle.trim()) {
+      alert(t('Please enter a task title.', 'Lütfen görev başlığı girin.', 'Proszę podać tytuł zadania.'));
+      return;
+    }
+
+    setProposalTasks(prevTasks => prevTasks.map(tk => {
+      if (tk.id === editingTaskId) {
+        return {
+          ...tk,
+          title: editTaskTitle.trim(),
+          description: editTaskDesc.trim(),
+          durationDays: Math.max(1, Number(editTaskDuration) || 1),
+          price: pricingType === 'itemized' ? Math.max(0, Number(editTaskPrice) || 0) : 0
+        };
+      }
+      return tk;
+    }));
+
+    handleCancelEditTask();
+  };
+
   // Inline DELETE task from local draft state
   const handleRemoveLocalTask = (id: string) => {
+    if (editingTaskId === id) {
+      handleCancelEditTask();
+    }
     setProposalTasks(proposalTasks.filter(item => item.id !== id));
   };
 
@@ -267,8 +332,56 @@ export default function ProposalsView({
     setNewMatUnitPrice(0);
   };
 
+  // Start editing existing material item
+  const handleStartEditMaterial = (mat: ProposalMaterial) => {
+    setEditingMaterialId(mat.id);
+    setEditMatTitle(mat.title);
+    setEditMatCategory(mat.category);
+    setEditMatQuantity(mat.quantity || 1);
+    setEditMatUnit(mat.unit || 'adet');
+    setEditMatUnitPrice(mat.unitPrice || 0);
+  };
+
+  // Cancel editing material item
+  const handleCancelEditMaterial = () => {
+    setEditingMaterialId(null);
+    setEditMatTitle('');
+    setEditMatCategory('Kaba İnşaat');
+    setEditMatQuantity(1);
+    setEditMatUnit('adet');
+    setEditMatUnitPrice(0);
+  };
+
+  // Save changes to existing material item
+  const handleSaveEditMaterial = () => {
+    if (!editingMaterialId) return;
+    if (!editMatTitle.trim()) {
+      alert(t('Please enter a material name.', 'Lütfen malzeme adı girin.', 'Proszę podać nazwę materiału.'));
+      return;
+    }
+
+    setProposalMaterials(prevMaterials => prevMaterials.map(mat => {
+      if (mat.id === editingMaterialId) {
+        return {
+          ...mat,
+          title: editMatTitle.trim(),
+          category: editMatCategory,
+          quantity: Math.max(1, Number(editMatQuantity) || 1),
+          unit: editMatUnit.trim() || 'adet',
+          unitPrice: Math.max(0, Number(editMatUnitPrice) || 0)
+        };
+      }
+      return mat;
+    }));
+
+    handleCancelEditMaterial();
+  };
+
   // Inline DELETE material from local draft state
   const handleRemoveLocalMaterial = (id: string) => {
+    if (editingMaterialId === id) {
+      handleCancelEditMaterial();
+    }
     setProposalMaterials(proposalMaterials.filter(item => item.id !== id));
   };
 
@@ -953,7 +1066,11 @@ export default function ProposalsView({
                   {editorId ? t('Edit Proposal Spec', 'Fiyat Teklifini Düzenle', 'Edytuj Specyfikację Oferty') : t('Create Proposal Spec', 'Yeni Fiyat Teklifi Hazırla', 'Przygotuj Specyfikację Oferty')}
                 </h3>
                 <button
-                  onClick={() => setIsEditorOpen(false)}
+                  onClick={() => {
+                    setIsEditorOpen(false);
+                    handleCancelEditTask();
+                    handleCancelEditMaterial();
+                  }}
                   className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full cursor-pointer"
                 >
                   <X className="w-5 h-5" />
@@ -1211,44 +1328,176 @@ export default function ProposalsView({
 
                     {/* Local Selected Table */}
                     {proposalTasks.length > 0 && (
-                      <div className="border border-slate-200/50 rounded-xl overflow-hidden bg-white text-xs">
-                        <table className="w-full text-left">
-                          <thead className="bg-slate-50 font-bold text-slate-500">
-                            <tr>
-                              <th className="p-2.5">{t('Task Spec', 'Görev / Açıklama', 'Zadanie')}</th>
-                              <th className="p-2.5 w-24 text-center">{t('Duration', 'Süre', 'Czas')}</th>
-                              {pricingType === 'itemized' && <th className="p-2.5 w-28 text-right">{t('Price', 'Tutar', 'Cena')}</th>}
-                              <th className="p-2.5 w-12 text-center"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {proposalTasks.map((tk, idx) => (
-                              <tr key={tk.id} className="hover:bg-slate-50/40">
-                                <td className="p-2.5">
-                                  <div className="font-semibold text-slate-800">{tk.title}</div>
-                                  {tk.description && <div className="text-[10px] text-slate-400">{tk.description}</div>}
-                                </td>
-                                <td className="p-2.5 text-center text-slate-500 font-medium">
-                                  {tk.durationDays} {t('days', 'gün', 'dni')}
-                                </td>
-                                {pricingType === 'itemized' && (
-                                  <td className="p-2.5 text-right font-mono font-bold text-slate-700">
-                                    {formatMoney(tk.price, settings)}
-                                  </td>
-                                )}
-                                <td className="p-2.5 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveLocalTask(tk.id)}
-                                    className="text-rose-600 hover:text-rose-800 p-0.5 cursor-pointer"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </td>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Pencil className="w-3 h-3 text-amber-500" />
+                            {t('Click pencil or double-click to edit any task', 'Görevi düzenlemek için kalem simgesine veya satıra çift tıklayın', 'Kliknij ołówek lub dwuklik, aby edytować zadanie')}
+                          </span>
+                          <span className="font-bold text-slate-500">{proposalTasks.length} {t('tasks', 'görev', 'zadań')}</span>
+                        </div>
+
+                        <div className="border border-slate-200/50 dark:border-slate-800 rounded-xl overflow-x-auto bg-white dark:bg-slate-900 text-xs shadow-xs">
+                          <table className="w-full text-left min-w-[500px]">
+                            <thead className="bg-slate-50 dark:bg-slate-800/60 font-bold text-slate-500 dark:text-slate-400">
+                              <tr>
+                                <th className="p-2.5">{t('Task Spec', 'Görev / Açıklama', 'Zadanie')}</th>
+                                <th className="p-2.5 w-24 text-center">{t('Duration', 'Süre', 'Czas')}</th>
+                                {pricingType === 'itemized' && <th className="p-2.5 w-28 text-right">{t('Price', 'Tutar', 'Cena')}</th>}
+                                <th className="p-2.5 w-24 text-center">{t('Actions', 'İşlemler', 'Akcje')}</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {proposalTasks.map((tk) => {
+                                if (editingTaskId === tk.id) {
+                                  return (
+                                    <tr key={tk.id} className="bg-amber-50/60 dark:bg-amber-950/30">
+                                      <td colSpan={pricingType === 'itemized' ? 4 : 3} className="p-3">
+                                        <div className="bg-white dark:bg-slate-900 border-2 border-amber-400/80 dark:border-amber-600/70 rounded-xl p-3.5 shadow-md space-y-3">
+                                          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                                            <div className="flex items-center gap-1.5 text-xs font-extrabold text-amber-900 dark:text-amber-300">
+                                              <Pencil className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                              <span>{t('Editing Task Item', 'Görevi Düzenle', 'Edycja Zadania')}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={handleSaveEditTask}
+                                                className="flex items-center gap-1 text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                                              >
+                                                <Check className="w-3.5 h-3.5" />
+                                                <span>{t('Save', 'Kaydet', 'Zapisz')}</span>
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={handleCancelEditTask}
+                                                className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium rounded-lg transition-colors cursor-pointer"
+                                              >
+                                                <X className="w-3.5 h-3.5" />
+                                                <span>{t('Cancel', 'Vazgeç', 'Anuluj')}</span>
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                            <div className="sm:col-span-2 space-y-1">
+                                              <label className="text-[10px] font-bold text-slate-500">{t('Job Title *', 'Görev Başlığı *', 'Tytuł zadania *')}</label>
+                                              <input
+                                                type="text"
+                                                value={editTaskTitle}
+                                                onChange={(e) => setEditTaskTitle(e.target.value)}
+                                                className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg font-medium text-slate-900 dark:text-slate-100 focus:bg-white focus:border-amber-500 focus:outline-none"
+                                                placeholder={t('e.g., Kitchen Demolition', 'Örn: Mutfak Sökümü', 'np. Demontaż')}
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') handleSaveEditTask();
+                                                  if (e.key === 'Escape') handleCancelEditTask();
+                                                }}
+                                              />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                              <label className="text-[10px] font-bold text-slate-500">{t('Est. Duration (Days)', 'Süre (Gün)', 'Czas trwania (Dni)')}</label>
+                                              <input
+                                                type="number"
+                                                min={1}
+                                                value={editTaskDuration}
+                                                onChange={(e) => setEditTaskDuration(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                                className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-center font-medium text-slate-900 dark:text-slate-100 focus:bg-white focus:border-amber-500 focus:outline-none"
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') handleSaveEditTask();
+                                                  if (e.key === 'Escape') handleCancelEditTask();
+                                                }}
+                                              />
+                                            </div>
+
+                                            {pricingType === 'itemized' ? (
+                                              <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-500">{t('Task Price', 'Birim Maliyet / Bedel', 'Cena zadania')}</label>
+                                                <input
+                                                  type="number"
+                                                  min={0}
+                                                  value={editTaskPrice}
+                                                  onChange={(e) => setEditTaskPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                                                  className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-right font-mono font-bold text-slate-900 dark:text-slate-100 focus:bg-white focus:border-amber-500 focus:outline-none"
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleSaveEditTask();
+                                                    if (e.key === 'Escape') handleCancelEditTask();
+                                                  }}
+                                                />
+                                              </div>
+                                            ) : (
+                                              <div className="flex items-center justify-center p-2 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-700 text-[10px] text-slate-400 font-semibold text-center">
+                                                {t('Fixed Price Mode Active', 'Götürü Fiyat Aktif', 'Ryczałt')}
+                                              </div>
+                                            )}
+
+                                            <div className="sm:col-span-4 space-y-1">
+                                              <label className="text-[10px] font-bold text-slate-500">{t('Special Instructions (Optional)', 'Açıklama / Detaylar (İsteğe Bağlı)', 'Szczegóły (Opcjonalnie)')}</label>
+                                              <input
+                                                type="text"
+                                                value={editTaskDesc}
+                                                onChange={(e) => setEditTaskDesc(e.target.value)}
+                                                className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:bg-white focus:border-amber-500 focus:outline-none"
+                                                placeholder={t('Specific details or scope of this task...', 'Bu görevin şantiye kapsamı ve detayları...', 'Szczegóły dotyczące zadania...')}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') handleSaveEditTask();
+                                                  if (e.key === 'Escape') handleCancelEditTask();
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+
+                                return (
+                                  <tr 
+                                    key={tk.id} 
+                                    onDoubleClick={() => handleStartEditTask(tk)}
+                                    className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                                    title={t('Double-click to edit', 'Düzenlemek için çift tıklayın', 'Kliknij dwukrotnie, aby edytować')}
+                                  >
+                                    <td className="p-2.5">
+                                      <div className="font-semibold text-slate-800 dark:text-slate-200">{tk.title}</div>
+                                      {tk.description && <div className="text-[10px] text-slate-400 dark:text-slate-500">{tk.description}</div>}
+                                    </td>
+                                    <td className="p-2.5 text-center text-slate-500 dark:text-slate-400 font-medium">
+                                      {tk.durationDays} {t('days', 'gün', 'dni')}
+                                    </td>
+                                    {pricingType === 'itemized' && (
+                                      <td className="p-2.5 text-right font-mono font-bold text-slate-700 dark:text-slate-200">
+                                        {formatMoney(tk.price, settings)}
+                                      </td>
+                                    )}
+                                    <td className="p-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleStartEditTask(tk)}
+                                          className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                                          title={t('Edit task', 'Görevi Düzenle', 'Edytuj zadanie')}
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveLocalTask(tk.id)}
+                                          className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                                          title={t('Delete task', 'Görevi Sil', 'Usuń zadanie')}
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1339,50 +1588,197 @@ export default function ProposalsView({
                     </div>
 
                     {proposalMaterials.length > 0 && (
-                      <div className="space-y-3">
-                        <div className="border border-slate-200/50 rounded-xl overflow-hidden bg-white text-xs">
-                          <table className="w-full text-left">
-                            <thead className="bg-slate-50 font-bold text-slate-500">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Pencil className="w-3 h-3 text-amber-500" />
+                            {t('Click pencil or double-click to edit any material', 'Malzemeyi düzenlemek için kalem simgesine veya satıra çift tıklayın', 'Kliknij ołówek lub dwuklik, aby edytować materiał')}
+                          </span>
+                          <span className="font-bold text-slate-500">{proposalMaterials.length} {t('materials', 'malzeme', 'materiałów')}</span>
+                        </div>
+
+                        <div className="border border-slate-200/50 dark:border-slate-800 rounded-xl overflow-x-auto bg-white dark:bg-slate-900 text-xs shadow-xs">
+                          <table className="w-full text-left min-w-[560px]">
+                            <thead className="bg-slate-50 dark:bg-slate-800/60 font-bold text-slate-500 dark:text-slate-400">
                               <tr>
                                 <th className="p-2.5">{t('Material Spec', 'Malzeme / Kategori', 'Materiał')}</th>
                                 <th className="p-2.5 w-28 text-center">{t('Qty', 'Miktar', 'Ilość')}</th>
                                 <th className="p-2.5 w-28 text-right">{t('Est Unit Price', 'Birim Fiyat', 'Cena jedn.')}</th>
                                 <th className="p-2.5 w-28 text-right">{t('Subtotal', 'Tutar', 'Łącznie')}</th>
-                                <th className="p-2.5 w-12 text-center"></th>
+                                <th className="p-2.5 w-24 text-center">{t('Actions', 'İşlemler', 'Akcje')}</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {proposalMaterials.map((mat) => (
-                                <tr key={mat.id} className="hover:bg-slate-50/40">
-                                  <td className="p-2.5">
-                                    <div className="font-semibold text-slate-850">{mat.title}</div>
-                                    <div className="text-[10px] text-slate-400">{translateCategory(mat.category, settings.lang)}</div>
-                                  </td>
-                                  <td className="p-2.5 text-center text-slate-600 font-medium">
-                                    {mat.quantity} {mat.unit}
-                                  </td>
-                                  <td className="p-2.5 text-right font-mono text-slate-500">
-                                    {formatMoney(mat.unitPrice, settings)}
-                                  </td>
-                                  <td className="p-2.5 text-right font-mono font-bold text-slate-700">
-                                    {formatMoney(mat.quantity * mat.unitPrice, settings)}
-                                  </td>
-                                  <td className="p-2.5 text-center">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveLocalMaterial(mat.id)}
-                                      className="text-rose-600 hover:text-rose-800 p-0.5 cursor-pointer"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {proposalMaterials.map((mat) => {
+                                if (editingMaterialId === mat.id) {
+                                  return (
+                                    <tr key={mat.id} className="bg-amber-50/60 dark:bg-amber-950/30">
+                                      <td colSpan={5} className="p-3">
+                                        <div className="bg-white dark:bg-slate-900 border-2 border-amber-400/80 dark:border-amber-600/70 rounded-xl p-3.5 shadow-md space-y-3">
+                                          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                                            <div className="flex items-center gap-1.5 text-xs font-extrabold text-amber-900 dark:text-amber-300">
+                                              <Pencil className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                              <span>{t('Editing Material Item', 'Malzemeyi Düzenle', 'Edycja Materiału')}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={handleSaveEditMaterial}
+                                                className="flex items-center gap-1 text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                                              >
+                                                <Check className="w-3.5 h-3.5" />
+                                                <span>{t('Save', 'Kaydet', 'Zapisz')}</span>
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={handleCancelEditMaterial}
+                                                className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium rounded-lg transition-colors cursor-pointer"
+                                              >
+                                                <X className="w-3.5 h-3.5" />
+                                                <span>{t('Cancel', 'Vazgeç', 'Anuluj')}</span>
+                                              </button>
+                                            </div>
+                                          </div>
+
+                                          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                                            <div className="sm:col-span-2 space-y-1">
+                                              <label className="text-[10px] font-bold text-slate-500">{t('Material Name *', 'Malzeme Tanımı *', 'Nazwa materiału *')}</label>
+                                              <input
+                                                type="text"
+                                                value={editMatTitle}
+                                                onChange={(e) => setEditMatTitle(e.target.value)}
+                                                className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg font-medium text-slate-900 dark:text-slate-100 focus:bg-white focus:border-amber-500 focus:outline-none"
+                                                placeholder={t('e.g., Ceramics Adhesive Glue', 'Örn: Kalekim Hazır Seramik Yapıştırıcı', 'np. Klej do płytek')}
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') handleSaveEditMaterial();
+                                                  if (e.key === 'Escape') handleCancelEditMaterial();
+                                                }}
+                                              />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                              <label className="text-[10px] font-bold text-slate-500">{t('Category', 'Kategori', 'Kategoria')}</label>
+                                              <select
+                                                value={editMatCategory}
+                                                onChange={(e) => setEditMatCategory(e.target.value as MaterialCategory)}
+                                                className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-850 dark:text-slate-100 cursor-pointer focus:bg-white focus:border-amber-500 focus:outline-none"
+                                              >
+                                                {CATEGORIES.map(cat => (
+                                                  <option key={cat} value={cat}>{translateCategory(cat, settings.lang)}</option>
+                                                ))}
+                                              </select>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                              <label className="text-[10px] font-bold text-slate-500">{t('Qty / Unit', 'Miktar / Birim', 'Ilość / Jedn.')}</label>
+                                              <div className="flex gap-1.5">
+                                                <input
+                                                  type="number"
+                                                  min={1}
+                                                  value={editMatQuantity}
+                                                  onChange={(e) => setEditMatQuantity(Math.max(1, parseFloat(e.target.value) || 1))}
+                                                  className="w-16 text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-center font-medium text-slate-900 dark:text-slate-100 focus:bg-white focus:border-amber-500 focus:outline-none"
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleSaveEditMaterial();
+                                                    if (e.key === 'Escape') handleCancelEditMaterial();
+                                                  }}
+                                                />
+                                                <input
+                                                  type="text"
+                                                  value={editMatUnit}
+                                                  onChange={(e) => setEditMatUnit(e.target.value)}
+                                                  className="w-16 text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-center text-slate-900 dark:text-slate-100 focus:bg-white focus:border-amber-500 focus:outline-none"
+                                                  placeholder="adet"
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleSaveEditMaterial();
+                                                    if (e.key === 'Escape') handleCancelEditMaterial();
+                                                  }}
+                                                />
+                                              </div>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                              <label className="text-[10px] font-bold text-slate-500">{t('Est Unit Cost', 'Birim Fiyat', 'Cena jedn.')}</label>
+                                              <input
+                                                type="number"
+                                                min={0}
+                                                value={editMatUnitPrice}
+                                                onChange={(e) => setEditMatUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                                                className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-right font-mono font-medium text-slate-900 dark:text-slate-100 focus:bg-white focus:border-amber-500 focus:outline-none"
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') handleSaveEditMaterial();
+                                                  if (e.key === 'Escape') handleCancelEditMaterial();
+                                                }}
+                                              />
+                                            </div>
+
+                                            <div className="sm:col-span-5 flex flex-wrap items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs gap-2">
+                                              <div className="flex items-center gap-1.5 text-slate-500">
+                                                <span className="text-[11px] font-semibold">{t('Calculated Subtotal:', 'Hesaplanan Kalem Tutarı:', 'Suma częściowa:')}</span>
+                                                <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-xs">
+                                                  {formatMoney((Number(editMatQuantity) || 0) * (Number(editMatUnitPrice) || 0), settings)}
+                                                </span>
+                                              </div>
+                                              <span className="text-[10px] text-slate-400">
+                                                {t('Press Enter to save, Esc to cancel', 'Kaydetmek için Enter, çıkmak için Esc tuşuna basın', 'Enter: zapisz, Esc: anuluj')}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+
+                                return (
+                                  <tr 
+                                    key={mat.id} 
+                                    onDoubleClick={() => handleStartEditMaterial(mat)}
+                                    className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                                    title={t('Double-click to edit', 'Düzenlemek için çift tıklayın', 'Kliknij dwukrotnie, aby edytować')}
+                                  >
+                                    <td className="p-2.5">
+                                      <div className="font-semibold text-slate-850 dark:text-slate-200">{mat.title}</div>
+                                      <div className="text-[10px] text-slate-400 dark:text-slate-500">{translateCategory(mat.category, settings.lang)}</div>
+                                    </td>
+                                    <td className="p-2.5 text-center text-slate-600 dark:text-slate-400 font-medium">
+                                      {mat.quantity} {mat.unit}
+                                    </td>
+                                    <td className="p-2.5 text-right font-mono text-slate-500 dark:text-slate-400">
+                                      {formatMoney(mat.unitPrice, settings)}
+                                    </td>
+                                    <td className="p-2.5 text-right font-mono font-bold text-slate-700 dark:text-slate-200">
+                                      {formatMoney(mat.quantity * mat.unitPrice, settings)}
+                                    </td>
+                                    <td className="p-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleStartEditMaterial(mat)}
+                                          className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                                          title={t('Edit material', 'Malzemeyi Düzenle', 'Edytuj materiał')}
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveLocalMaterial(mat.id)}
+                                          className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                                          title={t('Delete material', 'Malzemeyi Sil', 'Usuń materiał')}
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
 
-                        <div className="flex items-center justify-between p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 rounded-xl text-xs">
+                        <div className="flex items-center justify-between p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 rounded-xl text-xs mt-3">
                           <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-bold">
                             <ShoppingBag className="w-4 h-4 text-amber-600" />
                             <span>{t('Total Material Cost for Quotation:', 'Teklife Eklenen Malzeme Maliyeti Toplamı:', 'Łączny koszt materiałów do oferty:')}</span>
